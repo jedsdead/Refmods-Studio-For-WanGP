@@ -9,9 +9,28 @@ Refmods and the MiniMax H3 Prompt Builder in one WanGP plugin.
   prompt box and on its own tab, with an optional panel that writes the prompt with WanGP's prompt enhancer and
   Deepy tools for H3 prompts.
 
-This is version 0.1, which brings the two plugins together as they were: Refmods For Wan GP `0.38.1-fork.58`
-and MiniMax H3 Prompt Builder `4.4.0`. Their full guides are in [`docs/refmods.md`](docs/refmods.md) and
-[`docs/prompt-builder.md`](docs/prompt-builder.md). Connecting the two halves, and redesigning both tabs, come next.
+The Refmods half is Refmods For Wan GP `0.38.1-fork.58` as it was; its guide is in [`docs/refmods.md`](docs/refmods.md).
+The Prompt Builder was reworked in 0.2 (below). The 4.x builder's guide is kept in
+[`docs/prompt-builder.md`](docs/prompt-builder.md) for the parts that still apply: the enhancer and the Deepy tools.
+
+## The Prompt Builder
+
+Load your references on the Generator page as usual (start and end images, reference images, videos, audio) and arm
+any mods in the Refmods panel. The **Prompt Builder** tab reads them:
+
+- **Mode** is picked from what's loaded, and the buttons override it.
+- **What this generation sends** lists every label the pipeline will give, in its order. Click one to insert it
+  where you were typing. Dashed means it's sent but not used in the prompt yet.
+- **Subjects**: name and describe each one with the character creator, then say where its look comes from (a
+  picture, a mod, or the description only) and its voice (an audio reference, a voice mod, or gender and tone). In
+  Reference mode they write `subject_definitions` and `retention_analysis` in the bundled H3 guide's wording.
+- **Insert**: Shot, Camera, Subject and Dialogue write the guide's notation at the cursor.
+- **Enhance** on Action, Sound and Music asks the prompt enhancer set in Configuration to write that box.
+- The **live preview** shows the finished prompt, with the checks under it. **Insert into prompt** and **Append
+  window** put it in the prompt box.
+
+Under WanGP's prompt box, a compact strip shows the detected mode and the labels, and checks whatever is in the
+prompt box.
 
 ## Installing
 

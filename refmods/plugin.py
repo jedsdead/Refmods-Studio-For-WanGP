@@ -719,6 +719,47 @@ def _format_label_line(rows):
             "those come first): " + " · ".join(parts) + extra)
 
 
+def builder_mod_entries(state):
+    """Refmods Studio: the armed mods as the Prompt Builder needs them, in the
+    order and grouping _format_label_line uses. Each entry is
+    {"key", "name", "kind": "picture" | "video" | "audio", "count", "label"}
+    where count is how many labels it takes and label the number picked in
+    the panel (None for Auto). A soundtrack is its own audio entry. Reads the
+    selection the inline panel keeps in the session state."""
+    try:
+        payload = json.loads((state or {}).get(STASH_KEY) or "{}")
+    except Exception:
+        return []
+    out = []
+    for row in payload.get("rows") or []:
+        name = row.get("mod")
+        meta = _row_meta(name, row.get("strength", 0))
+        if meta is None:
+            continue
+        kind = meta.get("kind", "image")
+        latent_t = max(1, int(meta.get("latent_t", 1)))
+        send_as = row.get("send_as") or ("video" if row.get("as_video") else "pictures")
+        label = row.get("label")
+        entry = {"key": f"mod:{name}", "name": name, "label": label,
+                 "description": str(meta.get("description") or "")}
+        if _is_picture_mod(meta):
+            if send_as == "video" and latent_t > 1:
+                out.append(dict(entry, kind="video", count=1))
+            elif send_as == "sheet" and latent_t > 1:
+                out.append(dict(entry, kind="picture", count=1, sheet=True))
+            else:
+                out.append(dict(entry, kind="picture", count=latent_t))
+        elif kind == "video":
+            out.append(dict(entry, kind="video", count=1))
+        else:
+            out.append(dict(entry, kind="audio", count=1))
+            continue
+        if meta.get("has_audio") and row.get("use_audio", True):
+            out.append({"key": f"mod:{name}:audio", "name": f"{name} (soundtrack)", "kind": "audio",
+                        "count": 1, "label": row.get("audio_label"), "description": ""})
+    return out
+
+
 def _format_ref_counter(rows):
     """A live 'how close to MiniMax H3 Ref2VA's own native reference caps am
     I' readout, from the current (mod_name, strength, send-as-one-video) values of every

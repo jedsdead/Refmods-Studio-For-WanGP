@@ -1560,9 +1560,41 @@ class H3PromptBuilderPlugin(WAN2GPPlugin):
         self.request_component("model_choice_target")
         self._h3_setup()
         self._ui_copies = []
-        self.insert_after("prompt", self.create_ui)
+        # Refmods Studio 0.2: the reworked builder (studio_ui). It reads what
+        # the Generator page sends, so it asks for those inputs too. If it
+        # cannot be built, the 4.x builder is used instead.
+        self._studio_ui = None
+        try:
+            from .studio_ui import StudioUI, MEDIA_COMPONENTS, INSERT_JS
+            for name in MEDIA_COMPONENTS:
+                self.request_component(name)
+            self.add_custom_js(INSERT_JS)
+            self._studio_ui = StudioUI(self)
+        except Exception as exc:                          # noqa: BLE001
+            print(f"[Refmods Studio] the new Prompt Builder could not start, using the old one: {exc!r}")
+        self.insert_after("prompt", self._build_strip_or_old)
         self.add_tab(tab_id="h3_prompt_builder_tab", label="Prompt Builder",
-                     component_constructor=lambda: self.create_ui(inline=False))
+                     component_constructor=self._build_tab_or_old)
+
+    def _build_strip_or_old(self):
+        if self._studio_ui is not None:
+            try:
+                return self._studio_ui.build_strip()
+            except Exception as exc:                      # noqa: BLE001
+                import traceback
+                traceback.print_exc()
+                print(f"[Refmods Studio] the builder strip failed, using the old inline builder: {exc!r}")
+        return self.create_ui()
+
+    def _build_tab_or_old(self):
+        if self._studio_ui is not None:
+            try:
+                return self._studio_ui.build_tab()
+            except Exception as exc:                      # noqa: BLE001
+                import traceback
+                traceback.print_exc()
+                print(f"[Refmods Studio] the Prompt Builder tab failed, using the old one: {exc!r}")
+        return self.create_ui(inline=False)
 
     # -- prompt-enhancer generator -----------------------------------------
 
