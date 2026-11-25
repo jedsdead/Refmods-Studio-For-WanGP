@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.4] — 2026-11-25
+
+- **Write [/duration]** beside Length opens the prompt with WanGP's `[/duration=…s]` window command, from the
+  Length. **Append as new scene** merges `/new_shot` into it (`[/duration=10s,/new_shot]`) rather than adding a
+  second command. Saved with the prompt and the draft.
+
 ## [0.2.3] — 2026-11-25
 
 - **Each look source is set on its own.** A subject has up to four sources, each with its own ticks for what it

@@ -227,9 +227,10 @@ class StudioUI:
         return (detected if mode in (None, "", core.AUTO) else mode), detected
 
     @staticmethod
-    def _form(mode, duration, summary, style, action, sound, music, subjects):
+    def _form(mode, duration, summary, style, action, sound, music, subjects, window_duration=False):
         return core.clean_form({"mode": mode, "duration": duration, "summary": summary, "style": style,
-                                "action": action, "sound": sound, "music": music, "subjects": subjects or []})
+                                "action": action, "sound": sound, "music": music, "subjects": subjects or [],
+                                "window_duration": window_duration})
 
     def _lint(self):
         try:
@@ -365,6 +366,9 @@ class StudioUI:
                                 info="Auto picks the mode from what's loaded on the Generator page.", scale=3)
                 duration = gr.Number(10, label="Length (s)", precision=2, minimum=1, maximum=60, scale=0,
                                      min_width=110)
+                window_duration = gr.Checkbox(False, label="Write [/duration]", scale=0, min_width=150,
+                                              info="Opens the prompt with [/duration=…s], the length of this "
+                                                   "sliding window.")
             mode_line = gr.Markdown("")
             with gr.Row():
                 insert_btn = gr.Button("Insert into prompt", variant="primary", size="sm")
@@ -507,7 +511,7 @@ class StudioUI:
                     writer = self._build_writer()
 
         # ---- wiring -------------------------------------------------------------
-        form_inputs = [mode, duration, summary, style, action, sound, music, subjects]
+        form_inputs = [mode, duration, summary, style, action, sound, music, subjects, window_duration]
         self._wire_media(media_state, sig, [chips, f_voice] + [row[0] for row in look_rows], self._tab_refresh)
 
         def update_preview(blob, *values):
@@ -524,7 +528,7 @@ class StudioUI:
             return text, self._checks_md(result), line, self._chips_html(media, text)
 
         preview_outputs = [preview, checks, mode_line, chips]
-        for comp in (mode, duration, summary, style, action, sound, music, subjects, media_state):
+        for comp in (mode, duration, summary, style, action, sound, music, subjects, window_duration, media_state):
             comp.change(fn=update_preview, inputs=[media_state] + form_inputs, outputs=preview_outputs,
                         show_progress="hidden")
 
@@ -748,7 +752,14 @@ class StudioUI:
             return current, "Nothing to append yet."
         if not current:
             return text, "First window written."
-        joined = current + "\n\n" + ("[/new_shot] " if cut else "") + text
+        if cut:
+            # A new scene: zero overlap, merged into a window command already there.
+            if text.startswith("[/"):
+                end = text.index("]")
+                text = text[:end] + ",/new_shot" + text[end:]
+            else:
+                text = "[/new_shot]\n" + text
+        joined = current + "\n\n" + text
         windows = joined.count("\n\n") + 1
         return joined, (f"Appended as window {windows}. Set *How to Process each Line of the Text Prompt* to the "
                         "paragraph-per-sliding-window option.")

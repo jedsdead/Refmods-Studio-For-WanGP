@@ -55,7 +55,7 @@ SUBJECT_KEYS = ("kind", "name", "gender", "age", "ethnicity", "height", "build",
 # media, so they belong to the project, not the character.
 LIBRARY_KEYS = tuple(k for k in SUBJECT_KEYS if k not in ("look", "voice"))
 
-FORM_KEYS = ("mode", "duration", "summary", "style", "action", "sound", "music", "subjects")
+FORM_KEYS = ("mode", "duration", "summary", "style", "action", "sound", "music", "subjects", "window_duration")
 
 
 def _s(value) -> str:
@@ -70,7 +70,7 @@ def new_subject(kind="Character") -> dict:
 
 def new_form() -> dict:
     return {"mode": AUTO, "duration": 10.0, "summary": "", "style": "", "action": "", "sound": "",
-            "music": "N/A", "subjects": []}
+            "music": "N/A", "subjects": [], "window_duration": False}
 
 
 def clean_look(item, parts=None, sheet=False) -> dict:
@@ -111,6 +111,7 @@ def clean_form(data) -> dict:
         form["duration"] = 10.0
     if form["mode"] not in MODES:
         form["mode"] = AUTO
+    form["window_duration"] = bool(form["window_duration"])
     return form
 
 
@@ -614,8 +615,18 @@ def keyframe_line(mode: str, form: dict) -> str:
     return ""
 
 
+def duration_command(form: dict) -> str:
+    """WanGP's window command for this window's length, e.g. [/duration=10s]."""
+    return f"[/duration={float(form['duration'] or 0):g}s]" if form.get("window_duration") else ""
+
+
 def assemble(form: dict, media: list[Media], mode: str) -> str:
-    form = clean_form(form)
+    text = _assemble(clean_form(form), media, mode)
+    command = duration_command(clean_form(form))
+    return f"{command}\n{text}" if command else text
+
+
+def _assemble(form: dict, media: list[Media], mode: str) -> str:
     action = no_blank_lines(form["action"])
     style = _s(form["style"])
     sound = no_blank_lines(form["sound"]) or "N/A"
