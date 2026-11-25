@@ -1,0 +1,19 @@
+# Python build output. In the repo it blocks every user's Plugin Manager
+# update, because their own copies are untracked files at the same paths.
+__pycache__/
+*.pyc
+*.pyc.stale
+*.py[cod]
+
+# Written by the Prompt Builder half's enhancer panel at the plugin's top level.
+settings.json
+cast/
+cache/
+
+# No patch files in the repo or the zips.
+*.patch
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
