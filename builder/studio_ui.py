@@ -15,6 +15,7 @@ button puts its text at the cursor of the box you were last typing in.
 from __future__ import annotations
 
 import html
+import re
 import json
 import sys
 import time
@@ -60,11 +61,23 @@ INSERT_JS = r"""
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.focus();
   }
+  var actionUsed = false;
+  document.addEventListener('focusin', function (e) {
+    if (e.target && e.target.closest && e.target.closest('#rs-action')) actionUsed = true;
+  }, true);
   window.__rsInsert = function (text, to) {
     if (!text) return;
     var el = null;
-    if (to === 'prompt') el = promptBox();
-    else el = (last && document.body.contains(last)) ? last : document.querySelector('#rs-action textarea');
+    if (to === 'prompt') {
+      el = promptBox();
+    } else if (to === 'action') {
+      // Shots, times, camera moves and lines always go into the Action box:
+      // at its cursor, or at the end if it hasn't been clicked into yet.
+      el = document.querySelector('#rs-action textarea');
+      if (el && !actionUsed) { el.selectionStart = el.selectionEnd = el.value.length; }
+    } else {
+      el = (last && document.body.contains(last)) ? last : document.querySelector('#rs-action textarea');
+    }
     if (el) put(el, text);
   };
   document.addEventListener('click', function (e) {
@@ -77,6 +90,7 @@ INSERT_JS = r"""
 """
 
 INSERT_AFTER = "(s) => { if (window.__rsInsert) { window.__rsInsert(s); } }"
+INSERT_ACTION = "(s) => { if (window.__rsInsert) { window.__rsInsert(s, 'action'); } }"
 
 CHIP_CSS = """<style>
 .rs-chips{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0}
@@ -403,29 +417,33 @@ class StudioUI:
                         f_clothing = gr.Textbox(label="Clothing")
                         f_details = gr.Textbox(label="Anything else the camera sees",
                                                info="For a location, prop or style, describe it here.")
-                        with gr.Row():
-                            f_look = gr.Dropdown([], multiselect=True, label="Look comes from",
-                                                 info="Pictures or mods. Leave empty for description only.")
+                        f_voice_row = gr.Row()
+                        with f_voice_row:
                             f_voice = gr.Dropdown([("nothing: gender and tone only", "")], value="",
                                                   label="Voice comes from")
                             f_accent = gr.Textbox(label="Accent (only if wanted)", placeholder="Irish")
-                        with gr.Row():
-                            f_parts = gr.CheckboxGroup(list(core.PARTS), value=list(core.DEFAULT_PARTS),
-                                                       label="Taken from the picture",
-                                                       info="Leave clothing unticked when it comes from the "
-                                                            "description (partially preserved).")
-                            f_sheet = gr.Checkbox(False, label="It's a multi-view reference sheet")
+                        gr.Markdown("**Look comes from** · pick each picture, video or mod this subject uses, and "
+                                    "tick what it provides. Leave them empty for description only. Ticks that "
+                                    "leave out clothing make it partially preserved.")
+                        look_rows = []
+                        for i in range(core.MAX_LOOKS):
+                            with gr.Row():
+                                src = gr.Dropdown([("none", "")], value="", label=f"Source {i + 1}", scale=2,
+                                                  min_width=170)
+                                parts = gr.CheckboxGroup(list(core.PARTS), value=list(core.DEFAULT_PARTS),
+                                                         label="Provides", scale=4)
+                                sheet = gr.Checkbox(False, label="Reference sheet", scale=1, min_width=120)
+                            look_rows.append((src, parts, sheet))
+                    look_fields = [c for row in look_rows for c in row]
                     fields = [f_kind, f_name, f_gender, f_age, f_ethnicity, f_height, f_build, f_hairstyle,
-                              f_haircolor, f_eyecolor, f_clothing, f_details, f_look, f_parts, f_sheet, f_voice,
-                              f_accent]
+                              f_haircolor, f_eyecolor, f_clothing, f_details, f_voice, f_accent] + look_fields
                     field_keys = ["kind", "name", "gender", "age", "ethnicity", "height", "build", "hairstyle",
-                                  "haircolor", "eyecolor", "clothing", "details", "look", "parts", "sheet",
-                                  "voice", "accent"]
+                                  "haircolor", "eyecolor", "clothing", "details", "voice", "accent"]
 
                     with gr.Group():
-                        gr.Markdown("**Insert** · goes into the writing box you last clicked in (Summary, Style, "
-                                    "Action, Sound or Music), or Action if you haven't. *At* sets the time for Time, "
-                                    "Shot and Insert line.")
+                        gr.Markdown("**Insert** · Time, Shot, Camera and Insert line go into the Action box at "
+                                    "your cursor. Subject and the label chips go into the writing box you last "
+                                    "clicked in. *At* sets the time for Time, Shot and Insert line.")
                         with gr.Row():
                             at = gr.Number(0, label="At (s)", precision=3, minimum=0, scale=0, min_width=90)
                             time_btn = gr.Button("Time", size="sm")
@@ -447,8 +465,12 @@ class StudioUI:
                             d_btn = gr.Button("Insert line", size="sm")
                         snippet = gr.Textbox(visible=False)
 
-                    summary = gr.Textbox(label="Summary (Reference mode) · one or two sentences: who, where, "
-                                               "the situation", lines=1, elem_classes="rs-target")
+                    with gr.Row():
+                        gr.Markdown("**Summary** (Reference mode) · one or two sentences: who, where, the situation")
+                        sum_draft = gr.Button("Draft from the form", size="sm", scale=0, min_width=150)
+                        sum_enh = gr.Button("Enhance", size="sm", scale=0, min_width=90)
+                        sum_undo = gr.Button("Undo", size="sm", scale=0, min_width=70)
+                    summary = gr.Textbox(show_label=False, lines=1, elem_classes="rs-target")
                     style = gr.Textbox(label="Style · stays the same for the whole clip",
                                        placeholder="Live-action, cinematic, 35mm, teal and amber grade, night", lines=1,
                                        elem_classes="rs-target")
@@ -476,6 +498,7 @@ class StudioUI:
                     progress = self._progress_component()
                     enh_status = gr.Markdown("")
                     undo_action, undo_sound, undo_music = gr.State(""), gr.State(""), gr.State("")
+                    undo_summary = gr.State("")
 
                 with gr.Column(scale=2, min_width=400):
                     preview = gr.Textbox(label="Live preview · labels as predicted; the console prints the real ones",
@@ -485,7 +508,7 @@ class StudioUI:
 
         # ---- wiring -------------------------------------------------------------
         form_inputs = [mode, duration, summary, style, action, sound, music, subjects]
-        self._wire_media(media_state, sig, [chips, f_look, f_voice], self._tab_refresh)
+        self._wire_media(media_state, sig, [chips, f_voice] + [row[0] for row in look_rows], self._tab_refresh)
 
         def update_preview(blob, *values):
             media, model = self._unpack_media(blob)
@@ -523,11 +546,24 @@ class StudioUI:
 
         def field_values(subs, index):
             s = subs[index - 1] if subs and 1 <= (index or 0) <= len(subs) else core.new_subject()
-            return [s.get(k) for k in field_keys]
+            out = [s.get(k) for k in field_keys]
+            looks = [core.clean_look(l) for l in s.get("look") or []]
+            for i in range(core.MAX_LOOKS):
+                look = looks[i] if i < len(looks) else {"key": "", "parts": list(core.DEFAULT_PARTS), "sheet": False}
+                out += [look["key"], look["parts"], look["sheet"]]
+            return out
+
+        def subject_from(values):
+            n = len(field_keys)
+            data = dict(zip(field_keys, values[:n]))
+            rest = values[n:]
+            data["look"] = [{"key": rest[i], "parts": rest[i + 1], "sheet": rest[i + 2]}
+                            for i in range(0, len(rest), 3) if rest[i]]
+            return core.clean_subject(data)
 
         def on_fields(subs, index, *values):
             subs = [dict(s) for s in (subs or [])]
-            edited = core.clean_subject(dict(zip(field_keys, values)))
+            edited = subject_from(values)
             if not subs:
                 # Typing in the creator with no subject yet starts subject 1.
                 subs = [edited]
@@ -613,11 +649,11 @@ class StudioUI:
             return self._resolve_mode(m, media, model)[0]
 
         time_btn.click(fn=lambda t: f"At {core.timestamp(t)}, ", inputs=[at], outputs=[snippet]) \
-            .then(fn=None, inputs=[snippet], js=INSERT_AFTER)
+            .then(fn=None, inputs=[snippet], js=INSERT_ACTION)
         shot_btn.click(fn=lambda a, t: core.shot_snippet(a, t), inputs=[action, at], outputs=[snippet]) \
-            .then(fn=None, inputs=[snippet], js=INSERT_AFTER)
+            .then(fn=None, inputs=[snippet], js=INSERT_ACTION)
         cam_btn.click(fn=core.camera_snippet, inputs=[cam_move, cam_amp, cam_speed], outputs=[snippet]) \
-            .then(fn=None, inputs=[snippet], js=INSERT_AFTER)
+            .then(fn=None, inputs=[snippet], js=INSERT_ACTION)
         subj_btn.click(fn=lambda subs, i, m, b, a: core.subject_snippet(subs or [], int(i or 0), resolved_mode(m, b), a),
                        inputs=[subjects, subj_pick, mode, media_state, action], outputs=[snippet]) \
             .then(fn=None, inputs=[snippet], js=INSERT_AFTER)
@@ -625,7 +661,7 @@ class StudioUI:
                         subs or [], int(i or 0), media_of(b), resolved_mode(m, b), a, tone, lang, vo, line, t),
                     inputs=[subjects, d_who, media_state, mode, action, d_tone, d_lang, d_vo, d_line, at],
                     outputs=[snippet]) \
-            .then(fn=None, inputs=[snippet], js=INSERT_AFTER)
+            .then(fn=None, inputs=[snippet], js=INSERT_ACTION)
 
         # Into the prompt box.
         prompt = getattr(p, "prompt", None)
@@ -670,8 +706,20 @@ class StudioUI:
                             [sound, undo_sound, enh_status])
         self._bind_enhancer(mus_enh, "music", progress, [state, media_state, think] + form_inputs,
                             [music, undo_music, enh_status])
+        self._bind_enhancer(sum_enh, "summary", progress, [state, media_state, think] + form_inputs,
+                            [summary, undo_summary, enh_status])
+
+        def on_draft(blob, *values):
+            media, model = self._unpack_media(blob)
+            form = self._form(*values)
+            text = core.draft_summary(form, self._resolve_mode(form["mode"], media, model)[0])
+            if not text:
+                return gr.update(), gr.update(), "Add a subject first: the summary is drafted from them."
+            return text, form["summary"], "**Summary drafted** from the subjects and style. Edit it to say what's happening."
+
+        sum_draft.click(fn=on_draft, inputs=[media_state] + form_inputs, outputs=[summary, undo_summary, enh_status])
         for button, box, keep in ((act_undo, action, undo_action), (snd_undo, sound, undo_sound),
-                                  (mus_undo, music, undo_music)):
+                                  (mus_undo, music, undo_music), (sum_undo, summary, undo_summary)):
             button.click(fn=lambda old, cur: (old, cur) if old else (cur, old), inputs=[keep, box],
                          outputs=[box, keep])
         if writer is not None:
@@ -685,11 +733,13 @@ class StudioUI:
 
     def _tab_refresh(self, blob):
         media, _ = self._unpack_media(blob)
-        looks = [(f"{m.label_text} · {m.name}", m.key) for m in media if m.kind in ("picture", "video")
-                 and m.role not in ("start", "continue", "end")]
+        looks = [("none", "")] + [(f"{m.label_text} · {m.name}", m.key) for m in media
+                                  if m.kind in ("picture", "video") and m.role not in ("start", "continue", "end")]
         voices = [("nothing: gender and tone only", "")] + [(f"{m.label_text} · {m.name}", m.key)
                                                             for m in media if m.kind == "audio"]
-        return [self._chips_html(media), gr.update(choices=looks), gr.update(choices=voices)]
+        from . import studio_core as _c
+        return ([self._chips_html(media), gr.update(choices=voices)]
+                + [gr.update(choices=looks) for _ in range(_c.MAX_LOOKS)])
 
     @staticmethod
     def _append(current, text, cut):
@@ -879,6 +929,14 @@ class StudioUI:
                           "in relative words. Answer with the paragraph only, without the field name.")
                 request = (context + "\n\nTHE ACTION:\n" + (_s(form["action"]) or "(not written yet)")
                            + "\n\nWHAT THE USER TYPED FOR THE SOUND:\n" + (current or "(nothing yet)"))
+            elif part == "summary":
+                system = ("You write the summary section of a MiniMax H3 reference prompt: one or two plain English "
+                          "sentences saying who is in the video, where, and the overall situation, using the "
+                          "<Subject N> labels exactly as given. Never retell or paraphrase a spoken line, and never "
+                          "describe transitions, timed events or the order of shots. Write no task prefix in square "
+                          "brackets. Answer with the sentences only.")
+                request = (context + "\n\nTHE ACTION:\n" + (_s(form["action"]) or "(not written yet)")
+                           + "\n\nWHAT THE USER TYPED FOR THE SUMMARY:\n" + (current or "(nothing yet)"))
             else:
                 system = ("You write the non_diegetic_music field of a MiniMax H3 video prompt: background music only "
                           "the audience hears, in 1 to 3 English sentences about instrumentation, tempo, rhythm and "
@@ -896,7 +954,8 @@ class StudioUI:
         if part == "action":
             text = strip_to_action(text)
         else:
-            for name in ("overall_soundscape:", "non_diegetic_music:"):
+            text = re.sub(r"^\[[^\]]*\]\s*", "", text) if part == "summary" else text
+            for name in ("overall_soundscape:", "non_diegetic_music:", "summary:"):
                 if text.lower().startswith(name):
                     text = text[len(name):].strip()
         if not text:

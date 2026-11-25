@@ -24,7 +24,9 @@ AUTO = "Auto"
 
 KINDS = ("Character", "Location", "Prop", "Style")
 GENDERS = ("", "woman", "man", "girl", "boy", "person")
-PARTS = ("face", "hair", "skin", "body type", "clothing")
+PARTS = ("face", "hair", "skin", "body type", "clothing", "movement")
+IDENTITY = ("face", "hair", "skin", "body type", "clothing")
+MAX_LOOKS = 4
 DEFAULT_PARTS = ["face", "hair", "skin", "body type"]
 LANGUAGES = ("English", "French", "German", "Spanish", "Italian", "Portuguese", "Japanese", "Chinese",
              "Korean", "Russian", "Irish", "Arabic", "Hindi")
@@ -71,15 +73,27 @@ def new_form() -> dict:
             "music": "N/A", "subjects": []}
 
 
+def clean_look(item, parts=None, sheet=False) -> dict:
+    """One look source: {"key": media key, "parts": what it provides, "sheet": bool}.
+    Older saves held a plain key, with one set of parts for the whole subject."""
+    if isinstance(item, dict):
+        key = str(item.get("key") or "")
+        got = [p for p in (item.get("parts") or []) if p in PARTS]
+        return {"key": key, "parts": got or list(DEFAULT_PARTS), "sheet": bool(item.get("sheet"))}
+    got = [p for p in (parts or []) if p in PARTS]
+    return {"key": str(item or ""), "parts": got or list(DEFAULT_PARTS), "sheet": bool(sheet)}
+
+
 def clean_subject(data) -> dict:
     out = new_subject()
     if isinstance(data, dict):
         for key in SUBJECT_KEYS:
             if key in data and data[key] is not None:
                 out[key] = data[key]
-    out["look"] = [str(k) for k in (out["look"] or []) if k]
     out["parts"] = [p for p in (out["parts"] or []) if p in PARTS]
     out["sheet"] = bool(out["sheet"])
+    out["look"] = [clean_look(i, out["parts"], out["sheet"]) for i in (out["look"] or [])]
+    out["look"] = [l for l in out["look"] if l["key"]][:MAX_LOOKS]
     out["kind"] = out["kind"] if out["kind"] in KINDS else "Character"
     return out
 
@@ -334,20 +348,23 @@ def describe(subject: dict) -> str:
 
 
 def subject_media(subject: dict, media: dict) -> tuple[list, str]:
-    """(picture-or-video labels for the look, audio label for the voice)."""
+    """([(labels, kind, parts, sheet)] for each look source that is sent, voice label)."""
     looks = []
-    for key in subject.get("look") or []:
-        m = media.get(key)
-        if m and m.kind in ("picture", "video"):
-            looks.extend(m.labels)
+    for item in subject.get("look") or []:
+        item = clean_look(item)
+        m = media.get(item["key"])
+        if m and m.kind in ("picture", "video") and m.labels:
+            looks.append((list(m.labels), m.kind, item["parts"], item["sheet"]))
     voice = media.get(subject.get("voice") or "")
     return looks, (voice.labels[0] if voice and voice.kind == "audio" and voice.labels else "")
 
 
+PART_NAMES = {"face": "facial features", "hair": "hair", "skin": "skin", "body type": "body type",
+              "clothing": "clothing", "movement": "movement"}
+
+
 def _parts_phrase(parts) -> str:
-    names = {"face": "facial features", "hair": "hair", "skin": "skin", "body type": "body type",
-             "clothing": "clothing"}
-    return join_labels([names[p] for p in PARTS if p in (parts or [])]) or "visual identity"
+    return join_labels([PART_NAMES[p] for p in PARTS if p in (parts or [])]) or "visual identity"
 
 
 def _what_for(kind: str) -> str:
@@ -429,6 +446,49 @@ def task_prefix(media: list[Media], form: dict) -> str:
     return "[" + " + ".join(tasks) + "]"
 
 
+def _look_sentence(tag: str, subject: dict, labels: list, kind: str, parts: list, sheet: bool) -> str:
+    """What one look source provides, in the guide's wording."""
+    text = join_labels(labels)
+    many = len(labels) > 1
+    noun = ("source videos" if many else "source video") if kind == "video" else \
+        ("source pictures" if many else "source picture")
+    verb = "are" if many else "is"
+    pron = pronoun(subject)
+    if set(IDENTITY) <= set(parts) and not sheet:
+        phrase = "visual identity, facial features and body type"
+    else:
+        phrase = _parts_phrase(parts)
+    only = "only the " if "face" not in parts else "the "
+    if sheet:
+        who = _s(subject.get("name")) or "figure"
+        return (f"{text} {verb} a multi-view reference sheet of one single {gender_noun(subject)}, providing "
+                f"{only}{phrase} of {tag}. One single {who} stands in any frame and the sheet's panel layout never "
+                "appears as a frame.")
+    line = f"{text} {verb} the {noun} providing {only}{phrase} of {tag}"
+    if kind == "video" and "movement" not in parts:
+        line += (f"; only {pron} appearance is taken from it, and {pron} pose, movement and surroundings follow the "
+                 "visual description")
+    return line + "."
+
+
+def _attribution(looks) -> str:
+    """'The facial features and hair come from <Video 1>, and the clothing from <Picture 1>'."""
+    bits = []
+    for labels, _kind, parts, sheet in looks:
+        shown = [p for p in parts if p != "movement"]
+        if not shown:
+            continue
+        where = ("one panel of " if sheet else "") + join_labels(labels)
+        bits.append((_parts_phrase(shown), where))
+    if not bits:
+        return ""
+    many = " and " in bits[0][0] or "," in bits[0][0]
+    first = f"The {bits[0][0]} {'come' if many else 'comes'} from {bits[0][1]}"
+    rest = [f"the {p} from {w}" for p, w in bits[1:]]
+    return (first + (", and " + ", and ".join(rest) if rest else "")
+            + ", exactly as they appear there; everything else comes from the visual description.")
+
+
 def subject_definitions(form: dict, media: list[Media]) -> str:
     by_key = media_by_key(media)
     sids = speaker_ids(form["action"], form["subjects"], True)
@@ -439,40 +499,29 @@ def subject_definitions(form: dict, media: list[Media]) -> str:
         desc = describe(subject)
         kind = subject.get("kind") or "Character"
         sid = f" ({sids[n]})" if n in sids else ""
+        voice_text = (f" {voice} is the audio source providing the specific timbre, pitch and vocal character of "
+                      f"{tag}{sid}.") if voice else ""
         if kind == "Character" and looks:
-            parts = subject.get("parts") or list(DEFAULT_PARTS)
-            full = set(PARTS) <= set(parts) and not subject.get("sheet")
-            phrase = "visual identity, facial features and body type" if full else _parts_phrase(parts)
-            pics = join_labels(looks)
-            if subject.get("sheet"):
-                who = _s(subject.get("name")) or "figure"
-                line = (f"{tag}: {pics} {'is' if len(looks) == 1 else 'are'} a multi-view reference sheet of one "
-                        f"single {gender_noun(subject)}, providing the {phrase} of {tag}. One single {who} stands "
-                        "in any frame and the sheet's panel layout never appears as a frame.")
-            else:
-                line = (f"{tag}: {pics} {'is the source picture' if len(looks) == 1 else 'are the source pictures'}"
-                        f" providing the {phrase} of {tag}.")
-            if voice:
-                line += (f" {voice} is the audio source providing the specific timbre, pitch and vocal character "
-                         f"of {tag}{sid}.")
+            line = f"{tag}: " + " ".join(_look_sentence(tag, subject, *look) for look in looks) + voice_text
             if desc:
                 line += f" {desc[0].upper() + desc[1:]}."
-                if not full:
-                    where = "from one panel of " + pics if subject.get("sheet") else "from " + pics
-                    line += (f" The {_parts_phrase(parts)} come {where}, exactly as they appear there; everything "
-                             "else comes from the visual description.")
+                single_full = len(looks) == 1 and set(IDENTITY) <= set(looks[0][2]) and not looks[0][3]
+                if not single_full:
+                    line += " " + _attribution(looks)
         elif kind == "Character":
             who = _s(subject.get("name")) or "a character"
             line = f"{tag} is {who}, whose facial identity, build and clothing come from the visual description"
-            rest = desc[len(_s(subject.get("name"))):].lstrip(", ") if desc.startswith(_s(subject.get("name"))) \
-                and _s(subject.get("name")) else desc
-            line += (f": {rest}." if rest else ".")
-            if voice:
-                line += (f" {voice} is the audio source providing the specific timbre, pitch and vocal character "
-                         f"of {tag}{sid}.")
+            name = _s(subject.get("name"))
+            rest = desc[len(name):].lstrip(", ") if name and desc.startswith(name) else desc
+            line += (f": {rest}." if rest else ".") + voice_text
         elif looks:
-            line = (f"{tag}: {join_labels(looks)} {'is the source picture' if len(looks) == 1 else 'are the source pictures'}"
-                    f" providing the {_what_for(kind)} of {tag}." + (f" {desc[0].upper() + desc[1:]}." if desc else ""))
+            sentences = []
+            for labels, mkind, _parts, _sheet in looks:
+                many = len(labels) > 1
+                noun = "source video" if mkind == "video" else ("source pictures" if many else "source picture")
+                sentences.append(f"{join_labels(labels)} {'are' if many else 'is'} the {noun} providing the "
+                                 f"{_what_for(kind)} of {tag}.")
+            line = f"{tag}: " + " ".join(sentences) + (f" {desc[0].upper() + desc[1:]}." if desc else "")
         else:
             line = f"{tag} is {desc or 'described in the shots'}."
         lines.append(line)
@@ -481,37 +530,72 @@ def subject_definitions(form: dict, media: list[Media]) -> str:
 
 def retention_lines(form: dict, media: list[Media]) -> str:
     by_key = media_by_key(media)
-    lines, covered = [], set()
+    lines = []
     for n, subject in enumerate(form["subjects"], 1):
         tag = f"<Subject {n}>"
         kind = subject.get("kind") or "Character"
         looks, voice = subject_media(subject, by_key)
-        if looks:
-            parts = subject.get("parts") or list(DEFAULT_PARTS)
-            for label in looks:
-                covered.add(label)
+        for i, (labels, _mkind, parts, sheet) in enumerate(looks):
+            others = [(l, p) for j, (l, _k, p, _s2) in enumerate(looks) if j != i]
+            for label in labels:
                 if kind != "Character":
                     lines.append(f"{label}: fully_preserved. The {_what_for(kind)} of {tag} are kept.")
-                elif subject.get("sheet"):
-                    lines.append(f"{label}: partially_preserved. The {_parts_phrase(parts)} of {tag} are taken from "
-                                 "one panel of the reference sheet; everything else follows the description.")
-                elif set(PARTS) <= set(parts):
+                    continue
+                shown = [p for p in parts if p != "movement"]
+                if not shown and "movement" in parts:
+                    lines.append(f"{label}: transferred. Only the movement of {tag} follows it; "
+                                 f"{pronoun(subject)} appearance comes from elsewhere.")
+                    continue
+                if set(IDENTITY) <= set(parts) and not sheet:
                     lines.append(f"{label}: fully_preserved. {tag} is kept as shown, including the clothing.")
-                else:
-                    tail = ("the clothing follows the description" if "clothing" not in parts
-                            else "everything else follows the description")
-                    lines.append(f"{label}: partially_preserved. The {_parts_phrase(parts)} of {tag} are kept; {tail}.")
-        else:
+                    continue
+                verb = "are" if len(shown) > 1 else "is"
+                kept = f"The {_parts_phrase(shown)} of {tag} " + (
+                    f"{verb} taken from one panel of the reference sheet" if sheet else f"{verb} kept")
+                elsewhere = []
+                for other_labels, other_parts in others:
+                    extra = [p for p in other_parts if p not in parts and p != "movement"]
+                    if extra:
+                        elsewhere.append(f"the {_parts_phrase(extra)} {'come' if len(extra) > 1 else 'comes'} "
+                                         f"from {join_labels(other_labels)}")
+                missing_clothing = "clothing" not in parts and not any("clothing" in p for _l, p in others)
+                if missing_clothing:
+                    elsewhere.append("the clothing follows the description")
+                tail = "; ".join(elsewhere) or "everything else follows the description"
+                lines.append(f"{label}: partially_preserved. {kept}; {tail}.")
+        if not looks:
             shots = [f"[Shot {num}]" for num, text in shots_of(form["action"]) if tag in text
                      or (_s(subject.get("name")) and _s(subject.get("name")) in text)]
             if shots:
                 lines.append(f"{tag} (appears in {', '.join(shots)}): fully_preserved - follows the visual "
                              "description.")
         if voice:
-            covered.add(voice)
             lines.append(f"{voice}: reference. Provides the voice timbre, pitch and vocal character of {tag} without "
                          f"copying the original signal, used only for {pronoun(subject)} lines.")
     return "\n".join(lines)
+
+
+def draft_summary(form: dict, mode: str) -> str:
+    """A first summary from the form, in the guide's shape: who and where, for
+    you to finish with the situation. Never the dialogue, events or shots."""
+    form = clean_form(form)
+    reference = mode == "Reference"
+    people, places = [], []
+    for n, s in enumerate(form["subjects"], 1):
+        name = _s(s.get("name"))
+        label = f"<Subject {n}>" if reference else (name or f"a {gender_noun(s)}")
+        (places if s.get("kind") == "Location" else people).append((label, s))
+    if not people and not places:
+        return ""
+    text = join_labels([p for p, _ in people])
+    if places:
+        label, place = places[0]
+        detail = _s(place.get("details")).rstrip(".")
+        if not reference:
+            label = detail or label
+            detail = ""
+        text = (text + " in " if text else "") + label + (f", {detail}" if detail else "")
+    return text[0].upper() + text[1:] + "."
 
 
 def keyframe_line(mode: str, form: dict) -> str:
@@ -626,6 +710,16 @@ def checks(form: dict, media: list[Media], mode: str, text: str, detected: str, 
         name = display_name(subject, n)
         if not describe(subject) and not subject.get("look"):
             warnings.append(f"subject {n} has no description and no picture")
+        claimed = {}
+        for item in subject.get("look") or []:
+            item = clean_look(item)
+            label = media_by_key(media).get(item["key"])
+            where = label.label_text if label else item["key"]
+            for part in item["parts"]:
+                if part in claimed and claimed[part] != where:
+                    warnings.append(f"{name}'s {PART_NAMES[part]} come from both {claimed[part]} and {where}: "
+                                    "untick it on one of them")
+                claimed.setdefault(part, where)
         if subject.get("voice") and n not in sids:
             warnings.append(f"{name} has a voice but no line yet")
         if mode == "Reference" and f"<Subject {n}>" not in form["action"]:

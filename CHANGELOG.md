@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.3] — 2026-11-25
+
+- **Each look source is set on its own.** A subject has up to four sources, each with its own ticks for what it
+  provides (face, hair, skin, body type, clothing, movement) and its own reference-sheet box, so `<Video 1>` can give
+  the face and `<Picture 1>` the costume. Subject definitions and retention follow each source: a video gets the
+  guide's "only her appearance is taken from it" clause, a movement-only source is `transferred`, and the
+  description says which features come from which label. A check flags a feature claimed by two sources. Packs
+  will fill these rows in later.
+- **Summary: Draft from the form** writes who and where from the subjects, and **Enhance** asks the prompt enhancer
+  for one or two sentences on the situation, both with Undo.
+- Time, Shot, Camera and Insert line always go into the Action box (at its cursor, or at the end). Subject and the
+  label chips still go into the writing box last clicked.
+
 ## [0.2.2] — 2026-11-25
 
 - Typing in the character creator with no subject yet starts subject 1. Before, nothing happened until **+ New
