@@ -191,8 +191,8 @@ class StudioUI:
         return CHIP_CSS + "<div class='rs-chips'>" + "".join(chips) + "</div>" + legend
 
     @staticmethod
-    def _resolve_mode(mode, media):
-        detected = core.auto_mode(media)
+    def _resolve_mode(mode, media, model=None):
+        detected = core.auto_mode(media, model)
         return (detected if mode in (None, "", core.AUTO) else mode), detected
 
     @staticmethod
@@ -239,38 +239,54 @@ class StudioUI:
 
     def _strip_refresh(self, blob):
         media, model = self._unpack_media(blob)
-        mode = core.auto_mode(media)
+        mode = core.auto_mode(media, model)
         counts = core.media_summary(media)
-        line = (f"**Prompt Builder** · mode **{mode}** from {counts}. Write prompts in the *Prompt Builder* tab; "
-                "click a label to put it in the prompt box.")
+        line = (f"**Prompt Builder** · mode **{mode}** · sending {counts}. The full builder is in the "
+                "*Prompt Builder* tab; click a label here to put it in the prompt box.")
         if media and not model.get("h3"):
             line += " The selected model isn't MiniMax H3."
         return [self._chips_html(media, note=False), line]
 
     def _check_prompt_box(self, text, blob):
         media, model = self._unpack_media(blob)
-        mode = core.auto_mode(media)
         if not _s(text):
             return "The prompt box is empty."
+        import re
         lint = self._lint()
-        errors, warnings = [], []
+        errors, warnings, info = [], [], []
         if lint is not None:
             try:
-                report = lint(text, "Ref2VA" if mode == "Reference" else "auto", None, 0)
+                # The format is read from the text itself, window by window.
+                report = lint(text, "auto", None, 0)
                 errors += report.get("errors", [])
-                warnings += report.get("warnings", [])
+                counts = []
+                for w in report.get("warnings", []):
+                    m = re.search(r"has (\d+) words; 350-500 is normal", w)
+                    if m:
+                        counts.append(int(m.group(1)))
+                    else:
+                        warnings.append(w)
+                info.insert(0, f"{report.get('windows', 1)} window(s)")
+                if counts:
+                    span = f"{min(counts)}" if min(counts) == max(counts) else f"{min(counts)}-{max(counts)}"
+                    info.append(f"{span} words of shots per window (the guide's usual is 350-500)")
             except Exception:                          # noqa: BLE001
                 pass
         import re
         cited = set(re.findall(r"<(?:Picture|Video|Audio) \d+>", text))
         sent = {label for m in media for label in m.labels}
-        errors += [f"{label} is in the prompt but nothing loaded or armed gets that label"
-                   for label in sorted(cited - sent)]
+        missing = sorted(cited - sent, key=lambda l: (l.split()[0], int(re.sub(r"\D", "", l) or 0)))
+        if missing and not media:
+            errors.append(f"nothing is loaded or armed right now, so {core.join_labels(missing)} "
+                          "point at nothing: arm the mods or load the references before generating")
+        elif missing:
+            errors.append(f"{core.join_labels(missing)} {'is' if len(missing) == 1 else 'are'} in the prompt but "
+                          "nothing loaded or armed gets that label")
         for m in media:
             unused = [l for l in m.labels if l not in cited]
             if unused and m.role not in ("start", "continue", "end"):
                 warnings.append(f"{core.join_labels(unused)} ({m.name}) is sent but never used")
-        return self._checks_md({"errors": errors, "warnings": warnings, "info": []})
+        return self._checks_md({"errors": errors, "warnings": warnings, "info": info})
 
     def _wire_media(self, media_state, sig, outputs, render):
         """Re-read what's loaded whenever a Generator input changes, and every
@@ -453,7 +469,7 @@ class StudioUI:
         def update_preview(blob, *values):
             media, model = self._unpack_media(blob)
             form = self._form(*values)
-            resolved, detected = self._resolve_mode(form["mode"], media)
+            resolved, detected = self._resolve_mode(form["mode"], media, model)
             text = core.assemble(form, media, resolved)
             result = core.checks(form, media, resolved, text, detected, model, self._lint())
             line = f"Picked from the Generator page: {core.media_summary(media)} → **{detected}**."
@@ -567,7 +583,8 @@ class StudioUI:
             return self._unpack_media(blob)[0]
 
         def resolved_mode(m, blob):
-            return self._resolve_mode(m, media_of(blob))[0]
+            media, model = self._unpack_media(blob)
+            return self._resolve_mode(m, media, model)[0]
 
         shot_btn.click(fn=lambda a, t: core.shot_snippet(a, t), inputs=[action, at], outputs=[snippet]) \
             .then(fn=None, inputs=[snippet], js=INSERT_AFTER)
@@ -586,9 +603,9 @@ class StudioUI:
         prompt = getattr(p, "prompt", None)
 
         def build_text(blob, *values):
-            media, _ = self._unpack_media(blob)
+            media, model = self._unpack_media(blob)
             form = self._form(*values)
-            return core.assemble(form, media, self._resolve_mode(form["mode"], media)[0])
+            return core.assemble(form, media, self._resolve_mode(form["mode"], media, model)[0])
 
         if prompt is not None:
             insert_btn.click(fn=lambda b, *v: (build_text(b, *v), "Prompt replaced."),
@@ -806,9 +823,9 @@ class StudioUI:
         studio = getattr(self.plugin, "h3_studio", None)
         if studio is None:
             return (*keep, "The prompt enhancer isn't available, so nothing was written.")
-        media, _ = self._unpack_media(blob)
+        media, model = self._unpack_media(blob)
         form = self._form(*values)
-        mode = self._resolve_mode(form["mode"], media)[0]
+        mode = self._resolve_mode(form["mode"], media, model)[0]
         current = _s(form[part])
         context = self._context(form, media, mode)
         try:
@@ -885,9 +902,9 @@ class StudioUI:
             studio = getattr(self.plugin, "h3_studio", None)
             if studio is None:
                 raise gr.Error("The prompt enhancer isn't available.")
-            media, _ = self._unpack_media(blob)
+            media, model = self._unpack_media(blob)
             form = self._form(*values)
-            mode = self._resolve_mode(form["mode"], media)[0]
+            mode = self._resolve_mode(form["mode"], media, model)[0]
             family = "ref2va" if mode == "Reference" else "fl2va"
             request = _s(idea) or _s(form["action"])
             if not request:

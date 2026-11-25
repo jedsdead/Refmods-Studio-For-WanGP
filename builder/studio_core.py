@@ -245,9 +245,12 @@ def assign_labels(media: list[Media]) -> None:
             position += m.count
 
 
-def auto_mode(media: list[Media]) -> str:
+def auto_mode(media: list[Media], model: dict | None = None) -> str:
+    """Reference whenever references or mods are sent, and always on a Ref2VA
+    model: with nothing loaded it still takes the six sections, with subjects
+    defined by their descriptions."""
     roles = {m.role for m in media}
-    if roles & {"ref", "refvideo", "refaudio", "soundtrack", "mod"}:
+    if roles & {"ref", "refvideo", "refaudio", "soundtrack", "mod"} or (model or {}).get("ref2va"):
         return "Reference"
     keyframe_start = bool(roles & {"start", "continue"})
     if keyframe_start and "end" in roles:
@@ -534,13 +537,14 @@ def assemble(form: dict, media: list[Media], mode: str) -> str:
     sound = no_blank_lines(form["sound"]) or "N/A"
     music = no_blank_lines(form["music"]) or "N/A"
     if mode == "Reference":
+        # The guide's default format: each section between its own tags.
         body = "\n".join(b for b in (style, action) if b)
-        sections = ["subject_definitions:", subject_definitions(form, media) or "N/A",
-                    "summary:", f"{task_prefix(media, form)} {_s(form['summary'])}".strip(),
-                    "retention_analysis:", retention_lines(form, media) or "N/A",
-                    "detailed_description:", body,
-                    f"overall_soundscape: {sound}", f"non_diegetic_music: {music}"]
-        return no_blank_lines("\n".join(sections))
+        parts = [("subject_definitions", subject_definitions(form, media) or "N/A"),
+                 ("summary", f"{task_prefix(media, form)} {_s(form['summary'])}".strip()),
+                 ("retention_analysis", retention_lines(form, media) or "N/A"),
+                 ("detailed_description", body),
+                 ("overall_soundscape", sound), ("non_diegetic_music", music)]
+        return no_blank_lines("\n".join(f"<{name}>\n{text}\n</{name}>" for name, text in parts))
     lines = []
     instruction = keyframe_line(mode, form)
     if instruction:

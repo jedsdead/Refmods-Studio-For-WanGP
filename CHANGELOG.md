@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.1] — 2026-11-25
+
+- The format check reads prompts written with section tags (`<subject_definitions>` ... `</subject_definitions>`),
+  the H3 guide's default format. Before, every window of such a prompt failed as having no fields.
+- It also follows the default format on two points: an `<Audio N>` retention line may end with its speaker ID, and
+  a subject whose picture or video has a retention line needs none of its own.
+- **Check the prompt box** reads each window's format from the text instead of assuming the detected mode, sums up
+  the word counts in one line, and says plainly when labels point at nothing because nothing is loaded or armed.
+- Auto picks Reference on a Ref2VA model even with nothing loaded: subjects are then defined by their descriptions.
+- Reference mode writes each section between its tags, as the guide's default format does.
+
 ## [0.2.0] — 2026-11-25
 
 The Prompt Builder, reworked.

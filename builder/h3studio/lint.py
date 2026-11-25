@@ -72,10 +72,22 @@ def _jaccard(a: str, b: str) -> float:
     return len(x & y) / max(1, len(x | y))
 
 
+def normalize_tags(text: str) -> str:
+    """The guide's default format writes each section as <name> ... </name>.
+    Rewrite it as the plain `name:` headers the checks read, so both forms
+    pass. A closing tag goes with the line break before it, so no blank line
+    (which WanGP reads as a new window) is left behind."""
+    names = "|".join(sorted(set(BASE_FIELDS + REF_FIELDS)))
+    if not re.search(r"<(" + names + r")>", text or ""):
+        return text
+    text = re.sub(r"\n?[ \t]*</(" + names + r")>[ \t]*", "", text)
+    return re.sub(r"<(" + names + r")>[ \t]*", lambda m: m.group(1) + ": ", text)
+
+
 def check(prompt: str, mode: str = "auto", duration: float | None = None, expected_windows: int = 0) -> dict:
     errors: list[str] = []
     warnings: list[str] = []
-    text = (prompt or "").strip()
+    text = normalize_tags((prompt or "").replace("\r\n", "\n")).strip()
     if not text:
         return {"ok": False, "windows": 0, "modes": [], "errors": ["The prompt is empty."], "warnings": []}
 
@@ -258,7 +270,11 @@ def check(prompt: str, mode: str = "auto", duration: float | None = None, expect
         if w_mode == "Ref2VA":
             if "retention_analysis" in spans:
                 block = body[slice(*spans["retention_analysis"])]
-                if re.search(r"\(S\d+\)", block):
+                # The guide's default format ends an <Audio N> line with the speaker it
+                # serves; that one is allowed. Anywhere else a speaker ID is wrong.
+                stray = [line for line in block.split("\n") if re.search(r"\(S\d+\)", line)
+                         and not line.strip().startswith("<Audio ")]
+                if stray:
                     errors.append(f"{tag}speaker IDs must not appear in retention_analysis.")
                 for line in [l.strip() for l in block.strip().split("\n") if l.strip()]:
                     seen_marker = re.match(r"^(<(?:Subject|Picture|Video|Audio) \d+>)[^:]*:\s*([A-Za-z_]+)", line)
@@ -273,6 +289,15 @@ def check(prompt: str, mode: str = "auto", duration: float | None = None, expect
                 # sources a subject does not (see the guide's own complete example).
                 used_labels = {m.group(0) for m in LABEL.finditer(body)
                                if m.group(1) in ("Subject", "Audio")}
+                # The guide's default format keys retention by <Picture N>, <Video N> and
+                # <Audio N>, so a subject whose source label has its line needs none of its own.
+                defs = body[slice(*spans["subject_definitions"])] if "subject_definitions" in spans else ""
+                for subj in list(used_labels):
+                    if subj.startswith("<Subject"):
+                        line = next((l for l in defs.split("\n") if l.strip().startswith(subj)), "")
+                        sources = set(re.findall(r"<(?:Picture|Video) \d+>", line))
+                        if sources and sources <= covered:
+                            used_labels.discard(subj)
                 missing_lines = sorted(used_labels - covered)
                 if missing_lines:
                     warnings.append(f"{tag}retention_analysis has no line for " + ", ".join(missing_lines)
