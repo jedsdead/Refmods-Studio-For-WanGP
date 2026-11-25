@@ -1560,21 +1560,41 @@ class H3PromptBuilderPlugin(WAN2GPPlugin):
         self.request_component("model_choice_target")
         self._h3_setup()
         self._ui_copies = []
-        # Refmods Studio 0.2: the reworked builder (studio_ui). It reads what
-        # the Generator page sends, so it asks for those inputs too. If it
-        # cannot be built, the 4.x builder is used instead.
+        # Refmods Studio 0.3: the Prompt Builder is a web app in a frame, the way
+        # the Video Editor is (web_server, web_host, web/). Opening the tab
+        # captures the Generator form and the armed mods for it. If the web app
+        # cannot start, the Gradio builder (studio_ui) is used instead.
         self._studio_ui = None
+        self._web_host = None
+        for name in ("collect_current_model_settings_with_media", "get_model_name"):
+            self.request_global(name)
         try:
-            from .studio_ui import StudioUI, MEDIA_COMPONENTS, INSERT_JS
-            for name in MEDIA_COMPONENTS:
-                self.request_component(name)
-            self.add_custom_js(INSERT_JS)
-            self._studio_ui = StudioUI(self)
+            from .web_host import BuilderHost
+            from .web_server import WEB_PATH, create_app
+            self._web_host = BuilderHost(self)
+            self._web_path = WEB_PATH
+            self.register_web_app(WEB_PATH, lambda: create_app(self, self._web_host))
         except Exception as exc:                          # noqa: BLE001
-            print(f"[Refmods Studio] the new Prompt Builder could not start, using the old one: {exc!r}")
-        self.insert_after("prompt", self._build_strip_or_old)
+            self._web_host = None
+            print(f"[Refmods Studio] the Prompt Builder web app could not start, using the Gradio one: {exc!r}")
+        if self._web_host is None:
+            try:
+                from .studio_ui import StudioUI, MEDIA_COMPONENTS, INSERT_JS
+                for name in MEDIA_COMPONENTS:
+                    self.request_component(name)
+                self.add_custom_js(INSERT_JS)
+                self._studio_ui = StudioUI(self)
+            except Exception as exc:                      # noqa: BLE001
+                print(f"[Refmods Studio] the Gradio Prompt Builder could not start either: {exc!r}")
         self.add_tab(tab_id="h3_prompt_builder_tab", label="Prompt Builder",
                      component_constructor=self._build_tab_or_old)
+
+    def on_tab_select(self, state):
+        if self._web_host is not None:
+            try:
+                self._web_host.capture(state)
+            except Exception as exc:                      # noqa: BLE001
+                print(f"[Refmods Studio] Prompt Builder could not read the Generator page: {exc!r}")
 
     def _build_strip_or_old(self):
         if self._studio_ui is not None:
@@ -1587,6 +1607,12 @@ class H3PromptBuilderPlugin(WAN2GPPlugin):
         return self.create_ui()
 
     def _build_tab_or_old(self):
+        if self._web_host is not None:
+            # .wangp-addon-web-view lets WanGP's full-screen button size the frame.
+            gr.HTML(f'<div class="wangp-addon-web-view"><iframe src="{self._web_path}/?embedded=1" '
+                    'title="Prompt Builder" style="width:100%;height:calc(100vh - 150px);min-height:720px;'
+                    'border:0;border-radius:8px" allow="clipboard-write"></iframe></div>')
+            return
         if self._studio_ui is not None:
             try:
                 return self._studio_ui.build_tab()

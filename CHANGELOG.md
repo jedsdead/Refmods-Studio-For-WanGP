@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.0] — 2026-11-25
+
+The Prompt Builder is now a web app in the Prompt Builder tab, built the way the Video Editor is: its own HTML, CSS
+and JavaScript in a frame, served by WanGP, with the Python core behind it doing the labels, the prompt, the checks,
+saving and the prompt enhancer.
+
+- Matches the mockups: mode buttons, one toolbar row, label chips with thumbnails, subject cards with the
+  character creator underneath, look sources with toggle chips, the insert and line rows, and a live preview with
+  the labels, shots and lines highlighted and the checks under it. Follows WanGP's light or dark theme.
+- Reads the Generator page each time the tab is opened (WanGP saves the form just before), including the armed
+  mods. The note under the labels says when it was read.
+- Insert into prompt, Append window and Append as new scene write straight into the Generator page's prompt box,
+  and Check the prompt box reads it as it is.
+- Location, prop and style subjects show only a name and a description. Look sources show the ones in use plus one
+  free row.
+- The enhancer runs as a background job with its progress in the status line; Write it all opens in a dialog, with
+  Stop.
+- **Draft from what's sent** adds a subject for each picture or mod that has none.
+- The strip under the prompt box is gone. The Gradio builder from 0.2 stays as the fallback if the web app can't
+  start.
+
 ## [0.2.4] — 2026-11-25
 
 - **Write [/duration]** beside Length opens the prompt with WanGP's `[/duration=…s]` window command, from the

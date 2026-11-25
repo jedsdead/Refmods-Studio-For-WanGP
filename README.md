@@ -29,8 +29,8 @@ any mods in the Refmods panel. The **Prompt Builder** tab reads them:
 - The **live preview** shows the finished prompt, with the checks under it. **Insert into prompt** and **Append
   window** put it in the prompt box.
 
-Under WanGP's prompt box, a compact strip shows the detected mode and the labels, and checks whatever is in the
-prompt box.
+The builder reads the Generator page each time you open its tab, so load your references and arm your mods first.
+**Check the prompt box** checks whatever is in the Generator page's prompt box.
 
 ## Installing
 

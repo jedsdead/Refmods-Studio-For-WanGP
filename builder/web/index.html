@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prompt Builder</title>
+<link rel="stylesheet" href="static/builder.css?v=__V__">
+</head>
+<body>
+<div id="app">
+
+<header class="bar">
+  <span class="cap">Mode</span>
+  <div class="modes" id="modes" role="group" aria-label="Mode"></div>
+  <span id="detected" class="muted"></span>
+  <span class="grow"></span>
+  <label class="inline">Length <input id="duration" type="number" min="1" max="60" step="0.5" value="10"> s</label>
+  <label class="inline" title="Open the prompt with [/duration=…s], this sliding window's length"><input id="winDur" type="checkbox"> [/duration]</label>
+</header>
+
+<div class="toolbar">
+  <button id="btnInsert" class="primary" title="Replace the Generator page's prompt with this one">Insert into prompt</button>
+  <button id="btnAppend" title="Add this as the next sliding window">Append window</button>
+  <button id="btnScene" title="Add this as a new scene: a window with no overlap">Append as new scene</button>
+  <span class="sep"></span>
+  <input id="promptName" placeholder="Prompt name" aria-label="Prompt name">
+  <button id="btnSave">Save</button>
+  <select id="loadSel" aria-label="Saved prompts"></select>
+  <button id="btnLoad">Load</button>
+  <button id="btnRestore">Restore draft</button>
+  <button id="btnClear">Clear</button>
+  <span class="sep"></span>
+  <button id="btnWrite">Write it all…</button>
+  <button id="btnCheck" title="Check whatever is in the Generator page's prompt box">Check the prompt box</button>
+  <span class="grow"></span>
+  <span id="status" class="status" role="status"></span>
+</div>
+
+<section class="sends">
+  <div class="cap">What this generation sends · click a label to insert it where you were typing</div>
+  <div id="chips" class="chips"></div>
+  <div id="captureNote" class="muted small"></div>
+</section>
+
+<main class="cols">
+  <div class="left">
+    <section class="card">
+      <div class="card-head">
+        <span class="cap">Subjects</span>
+        <span class="muted small">Each can use pictures, mods, or just its description.</span>
+        <span class="grow"></span>
+        <button id="btnNewSubject" class="small">+ New subject</button>
+        <select id="libSel" class="small" aria-label="Saved subjects"></select>
+        <button id="btnLibLoad" class="small">Load</button>
+        <button id="btnDraftSubjects" class="small" title="One subject for each picture or mod that has none">Draft from what's sent</button>
+      </div>
+      <div id="cards" class="subject-grid"></div>
+      <div id="editor" class="editor"></div>
+    </section>
+
+    <section class="card insert">
+      <div class="row">
+        <span class="cap">Insert</span>
+        <label class="inline">At <input id="at" type="number" min="0" step="0.1" value="0" class="num"> s</label>
+        <button data-snip="time">Time</button>
+        <button data-snip="shot">Shot</button>
+        <span class="sep"></span>
+        <select id="camMove" aria-label="Camera move"></select>
+        <select id="camAmp" aria-label="Amplitude"></select>
+        <select id="camSpeed" aria-label="Speed"></select>
+        <button data-snip="camera">Camera</button>
+        <span class="sep"></span>
+        <select id="subjSel" aria-label="Subject"></select>
+        <button data-snip="subject">Subject</button>
+      </div>
+      <div class="row dialogue">
+        <span class="cap">Line</span>
+        <select id="dWho" aria-label="Speaker"></select>
+        <input id="dTone" placeholder="Tone: quiet, relieved" aria-label="Tone" class="tone">
+        <select id="dLang" aria-label="Language"></select>
+        <label class="inline"><input id="dVo" type="checkbox"> Voiceover</label>
+        <input id="dLine" placeholder="The line, word for word" aria-label="Line" class="grow">
+        <button data-snip="line" class="primary">Insert line</button>
+      </div>
+      <div class="muted small">Time, Shot, Camera and lines go into Action at its cursor. Subject and labels go into the box you last clicked.</div>
+    </section>
+
+    <section class="field">
+      <div class="field-head"><label for="summary">Summary</label><span class="muted small">Reference mode · one or two sentences: who, where, the situation</span><span class="grow"></span>
+        <button class="small" data-draft="summary">Draft</button><button class="small" data-enhance="summary">Enhance</button><button class="small" data-undo="summary">Undo</button></div>
+      <textarea id="summary" rows="2" class="box"></textarea>
+    </section>
+    <section class="field">
+      <div class="field-head"><label for="style">Style</label><span class="muted small">stays the same for the whole clip</span></div>
+      <textarea id="style" rows="1" class="box" placeholder="Live-action, cinematic, 35mm, teal and amber grade, night"></textarea>
+    </section>
+    <section class="field">
+      <div class="field-head"><label for="action">Action</label><span class="grow"></span>
+        <label class="inline small"><input id="think" type="checkbox"> Think</label>
+        <button class="small" data-enhance="action">Enhance</button><button class="small" data-undo="action">Undo</button></div>
+      <textarea id="action" rows="9" class="box" placeholder="[Shot 1] … use Insert for shots, camera moves, subjects and lines"></textarea>
+    </section>
+    <div class="pair">
+      <section class="field">
+        <div class="field-head"><label for="sound">Sound</label><span class="muted small">ambience and effects, never voices</span><span class="grow"></span>
+          <button class="small" data-enhance="sound">Enhance</button><button class="small" data-undo="sound">Undo</button></div>
+        <textarea id="sound" rows="3" class="box"></textarea>
+      </section>
+      <section class="field">
+        <div class="field-head"><label for="music">Music</label><span class="muted small">N/A unless you want a score</span><span class="grow"></span>
+          <button class="small" data-enhance="music">Enhance</button><button class="small" data-undo="music">Undo</button></div>
+        <textarea id="music" rows="3" class="box">N/A</textarea>
+      </section>
+    </div>
+  </div>
+
+  <aside class="right">
+    <section class="card sticky">
+      <div class="card-head"><span class="cap">Live preview</span><span class="muted small">labels as predicted · the console prints the real ones</span><span class="grow"></span><button id="btnCopy" class="small">Copy</button></div>
+      <pre id="preview" class="preview"></pre>
+      <div class="cap">Checks</div>
+      <ul id="checks" class="checks"></ul>
+    </section>
+  </aside>
+</main>
+
+<dialog id="writeDlg">
+  <form method="dialog" class="dlg">
+    <h2>Write it all with the prompt enhancer</h2>
+    <p class="muted small">Writes the whole prompt from an idea plus the subjects and style here, with the prompt enhancer set in Configuration. One paragraph per sliding window, separated by a blank line.</p>
+    <textarea id="wIdea" rows="4" placeholder="The idea"></textarea>
+    <div class="row"><label class="inline"><input id="wThink" type="checkbox"> Think</label><span class="grow"></span><button type="button" id="wGo" class="primary">Write</button><button type="button" id="wStop">Stop</button></div>
+    <textarea id="wOut" rows="12" placeholder="The written prompt appears here, ready to edit"></textarea>
+    <div id="wNote" class="muted small"></div>
+    <div class="row"><button type="button" id="wInsert">Insert into prompt</button><button type="button" id="wAppend">Append window</button><span class="grow"></span><button value="close">Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="checkDlg">
+  <form method="dialog" class="dlg">
+    <h2>The prompt box</h2>
+    <ul id="checkOut" class="checks"></ul>
+    <div class="row"><span class="grow"></span><button value="close">Close</button></div>
+  </form>
+</dialog>
+
+</div>
+<script src="static/builder.js?v=__V__"></script>
+</body>
+</html>

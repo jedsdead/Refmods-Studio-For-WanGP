@@ -177,10 +177,14 @@ def _one_path(item):
             if key in item and item[key]:
                 return _one_path(item[key])
         return None
-    for attr in ("path", "image", "video", "name"):
+    for attr in ("path", "image", "video", "name", "filename"):
         inner = getattr(item, attr, None)
-        if inner:
+        if isinstance(inner, str) and inner:
+            return inner
+        if inner and not isinstance(inner, (int, float)):
             return _one_path(inner)
+    if hasattr(item, "size") and hasattr(item, "mode"):
+        return "image"                    # a picture held in memory, with no file name
     return str(item)
 
 
