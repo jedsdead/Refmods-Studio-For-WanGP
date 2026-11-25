@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.2] — 2026-11-25
+
+- Typing in the character creator with no subject yet starts subject 1. Before, nothing happened until **+ New
+  subject** (was + Add subject) had been pressed, and nothing said so.
+- A **Time** button inserts `At 00:04.000, ` from the *At* box.
+- Inserts only go into the builder's writing boxes (Summary, Style, Action, Sound, Music): the one last clicked, or
+  Action. Before, they went into whatever box was clicked last, the creator's fields included. The strip's label
+  chips always go into WanGP's prompt box.
+
 ## [0.2.1] — 2026-11-25
 
 - The format check reads prompts written with section tags (`<subject_definitions>` ... `</subject_definitions>`),

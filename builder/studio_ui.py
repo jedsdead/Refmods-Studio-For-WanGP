@@ -33,29 +33,45 @@ IMAGE_CAPS = {"minimax_p_h3_image": 8, "minimax_h3_image": 16, "minimax_h3_image
 INSERT_JS = r"""
 (function () {
   if (window.__rsInsert) return;
+  // Only the builder's writing boxes (marked rs-target) are remembered, so an
+  // insert never lands in a name field or a number box.
   var last = null;
   document.addEventListener('focusin', function (e) {
     var t = e.target;
-    if (t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type === 'text'))) last = t;
+    if (!t || !t.closest) return;
+    if ((t.tagName === 'TEXTAREA' || t.tagName === 'INPUT') && t.closest('.rs-target')) last = t;
   }, true);
-  window.__rsInsert = function (text) {
-    if (!text) return;
-    var el = last;
-    if (!el || !document.body.contains(el)) {
-      el = document.querySelector('#rs-action textarea');
+  function promptBox() {
+    // The strip sits straight after WanGP's prompt box.
+    var node = document.getElementById('rs-strip');
+    for (var i = 0; node && i < 6; i++) {
+      node = node.previousElementSibling;
+      if (node) {
+        var box = node.matches && node.matches('textarea') ? node : node.querySelector('textarea');
+        if (box) return box;
+      }
     }
-    if (!el) return;
+    return null;
+  }
+  function put(el, text) {
     var start = (el.selectionStart == null) ? el.value.length : el.selectionStart;
     var end = (el.selectionEnd == null) ? start : el.selectionEnd;
     el.setRangeText(text, start, end, 'end');
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.focus();
+  }
+  window.__rsInsert = function (text, to) {
+    if (!text) return;
+    var el = null;
+    if (to === 'prompt') el = promptBox();
+    else el = (last && document.body.contains(last)) ? last : document.querySelector('#rs-action textarea');
+    if (el) put(el, text);
   };
   document.addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('[data-rs-insert]') : null;
     if (!b) return;
     e.preventDefault();
-    window.__rsInsert(b.getAttribute('data-rs-insert'));
+    window.__rsInsert(b.getAttribute('data-rs-insert'), b.getAttribute('data-rs-to'));
   }, true);
 })();
 """
@@ -167,7 +183,7 @@ class StudioUI:
     # -- shared pieces -------------------------------------------------------
 
     @staticmethod
-    def _chips_html(media, cited_text="", note=True) -> str:
+    def _chips_html(media, cited_text="", note=True, to="") -> str:
         if not media:
             return (CHIP_CSS + "<div class='rs-note'>Nothing loaded on the Generator page gets a label yet: "
                     "no start or end image, references or armed mods.</div>")
@@ -183,6 +199,7 @@ class StudioUI:
                     "soundtrack": "soundtrack", "mod": "mod"}.get(m.role, m.role)
             text = m.label_text
             chips.append(f"<button class='rs-chip {css}' data-rs-insert='{html.escape(text, quote=True)}' "
+                         f"data-rs-to='{to}' "
                          f"title='Insert {html.escape(text, quote=True)}'>{html.escape(text)} "
                          f"<small>{html.escape(what)} · {html.escape(m.name)}</small></button>")
         legend = ("<div class='rs-note'>Blue: from the Generator page. Purple: armed mods. Teal: audio. Dashed: "
@@ -218,11 +235,11 @@ class StudioUI:
 
     def build_strip(self):
         start_visible = self.plugin._starts_visible() if hasattr(self.plugin, "_starts_visible") else True
-        with gr.Column(visible=start_visible, elem_classes="rs-strip") as root:
+        with gr.Column(visible=start_visible, elem_classes="rs-strip", elem_id="rs-strip") as root:
             with gr.Row():
                 status = gr.Markdown("**Prompt Builder**: write prompts in the *Prompt Builder* tab.")
                 check_btn = gr.Button("Check the prompt box", size="sm", scale=0, min_width=180)
-            chips = gr.HTML(self._chips_html([], note=False))
+            chips = gr.HTML(self._chips_html([], note=False, to="prompt"))
             result = gr.Markdown("")
             media_state = gr.State({})
             sig = gr.State("")
@@ -245,7 +262,7 @@ class StudioUI:
                 "*Prompt Builder* tab; click a label here to put it in the prompt box.")
         if media and not model.get("h3"):
             line += " The selected model isn't MiniMax H3."
-        return [self._chips_html(media, note=False), line]
+        return [self._chips_html(media, note=False, to="prompt"), line]
 
     def _check_prompt_box(self, text, blob):
         media, model = self._unpack_media(blob)
@@ -327,7 +344,7 @@ class StudioUI:
 
     def build_tab(self):
         p = self.plugin
-        with gr.Column() as root:
+        with gr.Column(elem_classes="rs-tab") as root:
             warning = gr.Markdown(visible=False)
             with gr.Row(equal_height=True):
                 mode = gr.Radio([core.AUTO] + list(core.MODES), value=core.AUTO, label="Mode",
@@ -358,10 +375,11 @@ class StudioUI:
                     with gr.Group():
                         gr.Markdown("**Subjects** · each can use a picture, a mod, or just its description. "
                                     "In Reference mode they write subject_definitions and retention_analysis.")
-                        cards = gr.Markdown("*No subjects yet: press **+ Add subject**.*")
+                        cards = gr.Markdown("*No subjects yet. Fill in the creator below to start subject 1, or "
+                                            "press **+ New subject**.*")
                         with gr.Row():
                             pick = gr.Dropdown([], label="Editing", scale=2, min_width=160)
-                            add_btn = gr.Button("+ Add subject", size="sm")
+                            add_btn = gr.Button("+ New subject", size="sm")
                             up_btn = gr.Button("↑", size="sm", min_width=40, scale=0)
                             down_btn = gr.Button("↓", size="sm", min_width=40, scale=0)
                             remove_btn = gr.Button("Remove", size="sm")
@@ -405,10 +423,12 @@ class StudioUI:
                                   "voice", "accent"]
 
                     with gr.Group():
-                        gr.Markdown("**Insert** · goes in wherever you were last typing (the Action box if "
-                                    "you haven't clicked into one)")
+                        gr.Markdown("**Insert** · goes into the writing box you last clicked in (Summary, Style, "
+                                    "Action, Sound or Music), or Action if you haven't. *At* sets the time for Time, "
+                                    "Shot and Insert line.")
                         with gr.Row():
                             at = gr.Number(0, label="At (s)", precision=3, minimum=0, scale=0, min_width=90)
+                            time_btn = gr.Button("Time", size="sm")
                             shot_btn = gr.Button("Shot", size="sm")
                             cam_move = gr.Dropdown(list(core.CAMERA_MOVES), value="Push In", label="Camera",
                                                    min_width=130)
@@ -428,15 +448,16 @@ class StudioUI:
                         snippet = gr.Textbox(visible=False)
 
                     summary = gr.Textbox(label="Summary (Reference mode) · one or two sentences: who, where, "
-                                               "the situation", lines=1)
+                                               "the situation", lines=1, elem_classes="rs-target")
                     style = gr.Textbox(label="Style · stays the same for the whole clip",
-                                       placeholder="Live-action, cinematic, 35mm, teal and amber grade, night", lines=1)
+                                       placeholder="Live-action, cinematic, 35mm, teal and amber grade, night", lines=1,
+                                       elem_classes="rs-target")
                     with gr.Row():
                         gr.Markdown("**Action**")
                         think = gr.Checkbox(False, label="Think (Qwen enhancers)", scale=0, min_width=200)
                         act_enh = gr.Button("Enhance", size="sm", scale=0, min_width=90)
                         act_undo = gr.Button("Undo", size="sm", scale=0, min_width=70)
-                    action = gr.Textbox(show_label=False, lines=8, elem_id="rs-action",
+                    action = gr.Textbox(show_label=False, lines=8, elem_id="rs-action", elem_classes="rs-target",
                                         placeholder="[Shot 1] ... Use the Insert buttons for shots, camera moves, "
                                                     "subjects and lines.")
                     with gr.Row():
@@ -445,13 +466,13 @@ class StudioUI:
                                 gr.Markdown("**Sound** · ambience and effects, never voices")
                                 snd_enh = gr.Button("Enhance", size="sm", scale=0, min_width=90)
                                 snd_undo = gr.Button("Undo", size="sm", scale=0, min_width=70)
-                            sound = gr.Textbox(show_label=False, lines=2)
+                            sound = gr.Textbox(show_label=False, lines=2, elem_classes="rs-target")
                         with gr.Column():
                             with gr.Row():
                                 gr.Markdown("**Music** · N/A unless you want a score")
                                 mus_enh = gr.Button("Enhance", size="sm", scale=0, min_width=90)
                                 mus_undo = gr.Button("Undo", size="sm", scale=0, min_width=70)
-                            music = gr.Textbox(show_label=False, lines=2, value="N/A")
+                            music = gr.Textbox(show_label=False, lines=2, value="N/A", elem_classes="rs-target")
                     progress = self._progress_component()
                     enh_status = gr.Markdown("")
                     undo_action, undo_sound, undo_music = gr.State(""), gr.State(""), gr.State("")
@@ -494,7 +515,8 @@ class StudioUI:
                 look = "picture or mod" if s.get("look") else "description only"
                 voice = "with a voice" if s.get("voice") else "gender and tone"
                 lines.append(f"**{n} · {core.display_name(s, n)}** ({s.get('kind')}) · look: {look} · voice: {voice}")
-            card = "  \n".join(lines) or "*No subjects yet: press **+ Add subject**.*"
+            card = "  \n".join(lines) or ("*No subjects yet. Fill in the creator below to start subject 1, or "
+                                       "press **+ New subject**.*")
             value = index if subs else None
             return (gr.update(choices=choices, value=value), card, gr.update(choices=choices, value=value),
                     gr.update(choices=choices, value=value))
@@ -505,10 +527,14 @@ class StudioUI:
 
         def on_fields(subs, index, *values):
             subs = [dict(s) for s in (subs or [])]
-            if not subs or not index or not (1 <= int(index) <= len(subs)):
-                return [subs, gr.update(), gr.update(), gr.update(), gr.update()]
-            subs[int(index) - 1] = core.clean_subject(dict(zip(field_keys, values)))
-            return [subs, *lists(subs, int(index))]
+            edited = core.clean_subject(dict(zip(field_keys, values)))
+            if not subs:
+                # Typing in the creator with no subject yet starts subject 1.
+                subs = [edited]
+                return [subs, *lists(subs, 1)]
+            index = int(index) if index and 1 <= int(index) <= len(subs) else len(subs)
+            subs[index - 1] = edited
+            return [subs, *lists(subs, index)]
 
         for comp in fields:
             comp.input(fn=on_fields, inputs=[subjects, pick] + fields, outputs=subj_outputs, show_progress="hidden")
@@ -586,6 +612,8 @@ class StudioUI:
             media, model = self._unpack_media(blob)
             return self._resolve_mode(m, media, model)[0]
 
+        time_btn.click(fn=lambda t: f"At {core.timestamp(t)}, ", inputs=[at], outputs=[snippet]) \
+            .then(fn=None, inputs=[snippet], js=INSERT_AFTER)
         shot_btn.click(fn=lambda a, t: core.shot_snippet(a, t), inputs=[action, at], outputs=[snippet]) \
             .then(fn=None, inputs=[snippet], js=INSERT_AFTER)
         cam_btn.click(fn=core.camera_snippet, inputs=[cam_move, cam_amp, cam_speed], outputs=[snippet]) \
