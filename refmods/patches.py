@@ -3120,7 +3120,15 @@ def _run_extract_audio_job(pipeline_self, spec: dict, status) -> None:
                   f"used -- raise that slider before extracting if you want more of it kept.")
     except Exception:
         pass
-    waveform = storage.load_audio_waveform(audio_path, max_seconds=target_seconds)
+    # Refmods Studio: a trimmed audio file starts at its trim start (Create page).
+    trim = (spec.get("video_trims") or {}).get(os.path.basename(str(audio_path)))
+    if trim and float(trim[0]) > 0:
+        waveform = storage.extract_audio_from_video(audio_path, max_seconds=target_seconds,
+                                                    start_seconds=float(trim[0]))
+        if waveform is None:
+            raise ExtractionBlocked(f"No audio could be read from {os.path.basename(str(audio_path))}.")
+    else:
+        waveform = storage.load_audio_waveform(audio_path, max_seconds=target_seconds)
     duration = _require_audio_length(waveform, f"The audio file {os.path.basename(str(audio_path))}")
     if spec.get("clean_audio"):   # fork.41
         waveform = _clean_waveform(waveform, status)

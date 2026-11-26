@@ -31,7 +31,7 @@ import gradio as gr
 from shared.utils.plugins import WAN2GPPlugin
 
 PLUGIN_NAME = "Refmods Studio"
-PLUGIN_VERSION = "0.6.0"
+PLUGIN_VERSION = "0.7.0"
 
 # Kept on this module so other plugins that look for Refmods by these names
 # still find it here: 2 Phases Plus checks the plugin module of an enabled
@@ -225,7 +225,7 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
         self._rs_halves = {}           # half -> plugin object
         self._rs_errors = {}           # half -> sentence for the settings panel
         self._rs_forward = set(_ALWAYS_FORWARD)
-        self._rs_tab_half = {}         # tab label -> half
+        self._rs_subtabs = []          # (label, constructor, half): the halves' tabs, as subtabs
         self._rs_blocked = []
         super().__init__()
         self.name = PLUGIN_NAME
@@ -316,6 +316,10 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
         for half, plugin in self._rs_halves.items():
             self._rs_gather(half, plugin)
 
+        # One Refmods Studio tab, with each half's tab as a subtab.
+        if self._rs_subtabs:
+            self.add_tab(tab_id="refmods_studio", label=PLUGIN_NAME, component_constructor=self._rs_studio_ui)
+
         if not self._rs_halves:
             self.add_tab(tab_id="refmods_studio_settings", label=PLUGIN_NAME,
                          component_constructor=self._rs_settings_ui)
@@ -329,9 +333,7 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
             self.request_global(name)
             self._rs_forward.add(name)
         for tab_id, tab in plugin.tabs.items():
-            tab.component_constructor = self._rs_wrap_tab(tab.component_constructor)
-            self.tabs[tab_id] = tab
-            self._rs_tab_half[tab.label] = half
+            self._rs_subtabs.append((tab.label, tab.component_constructor, half))
         self._insert_after_requests.extend(plugin._insert_after_requests)
         plugin._insert_after_requests.clear()
         for hook, callbacks in plugin._data_hooks.items():
@@ -344,24 +346,30 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
         if plugin._deepy_toolbox is not None and self._deepy_toolbox is None:
             self._deepy_toolbox = plugin._deepy_toolbox
 
-    def _rs_wrap_tab(self, constructor):
-        """The settings fold goes at the top of each half's tab."""
+    @staticmethod
+    def _rs_takes_api(constructor):
         import inspect
         try:
             params = [p for p in inspect.signature(constructor).parameters.values()
                       if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
-            takes_api = len(params) >= 1
+            return len(params) >= 1
         except (TypeError, ValueError):
-            takes_api = False
-        if takes_api:
-            def build(api_session):
-                self._rs_settings_ui(folded=True)
-                return constructor(api_session)
-        else:
-            def build():
-                self._rs_settings_ui(folded=True)
-                return constructor()
-        return build
+            return False
+
+    def _rs_studio_ui(self, api_session=None):
+        """The Refmods Studio tab: the settings fold, then a subtab per half (Refmods, Prompt Builder)."""
+        self._rs_settings_ui(folded=True)
+        with gr.Tabs(elem_classes="rs-studio-tabs"):
+            for label, constructor, half in self._rs_subtabs:
+                with gr.Tab(label):
+                    try:
+                        if self._rs_takes_api(constructor):
+                            constructor(api_session)
+                        else:
+                            constructor()
+                    except Exception as exc:          # noqa: BLE001
+                        self._rs_fail(half, f"could not build its {label} tab", exc)
+                        gr.Markdown(f"⚠️ The {label} tab could not be built: `{exc!r}`. The console has the details.")
 
     def post_ui_setup(self, components):
         updates = {}
@@ -373,20 +381,24 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
     def on_model_change(self, state, model_type):
         self._rs_each("on_model_change", state, model_type)
 
-    def _rs_tab_plugin(self, state):
-        half = self._rs_tab_half.get((state or {}).get("_active_plugin_tab"))
-        return self._rs_halves.get(half)
-
     def on_tab_select(self, state):
-        plugin = self._rs_tab_plugin(state)
-        if plugin is not None and type(plugin).on_tab_select is not WAN2GPPlugin.on_tab_select:
-            return plugin.on_tab_select(state)
-        return None
+        """Opening the Refmods Studio tab: each half hears it (the Prompt Builder reads the Generator page)."""
+        result = None
+        for plugin in self._rs_halves.values():
+            if type(plugin).on_tab_select is not WAN2GPPlugin.on_tab_select:
+                try:
+                    result = plugin.on_tab_select(state) or result
+                except Exception as exc:              # noqa: BLE001
+                    print(f"[{PLUGIN_NAME}] on_tab_select failed: {exc!r}")
+        return result
 
     def on_tab_deselect(self, state):
-        plugin = self._rs_tab_plugin(state)
-        if plugin is not None and type(plugin).on_tab_deselect is not WAN2GPPlugin.on_tab_deselect:
-            plugin.on_tab_deselect(state)
+        for plugin in self._rs_halves.values():
+            if type(plugin).on_tab_deselect is not WAN2GPPlugin.on_tab_deselect:
+                try:
+                    plugin.on_tab_deselect(state)
+                except Exception as exc:              # noqa: BLE001
+                    print(f"[{PLUGIN_NAME}] on_tab_deselect failed: {exc!r}")
 
     # -- UI -----------------------------------------------------------------
 

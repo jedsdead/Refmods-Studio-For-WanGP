@@ -263,7 +263,7 @@ class Service:
         if kind == "line":
             return core.dialogue_snippet(form["subjects"], int(args.get("index") or 0), media, mode, form["action"],
                                          args.get("tone", ""), args.get("language", "English"),
-                                         bool(args.get("voiceover")), args.get("line", ""), args.get("at"))
+                                         bool(args.get("voiceover")), args.get("line", ""), None)   # only Time writes a time
         if kind == "summary":
             return core.draft_summary(form, mode)
         return ""
@@ -278,6 +278,123 @@ class Service:
         note = (f"Added {len(added)} subject(s) from what's sent." if added
                 else "Every picture and mod already has a subject.")
         return {"form": form, "note": note}
+
+    # -- packs (Refmods) ---------------------------------------------------------------
+
+    def _storage(self):
+        import sys
+        root = (__package__ or "").rsplit(".", 1)[0]
+        return sys.modules.get(f"{root}.refmods.storage")
+
+    def pack_list(self):
+        storage = self._storage()
+        if storage is None:
+            return []
+        out = []
+        for name in storage.list_packs():
+            pack = storage.read_pack(name) or {}
+            out.append({"name": name, "kind": pack.get("kind", "mixed"), "character": bool(pack.get("subject")),
+                        "mods": len([m for m in pack.get("members") or [] if m.get("on", True) is not False])})
+        return out
+
+    def load_pack(self, name, form):
+        """A pack as a subject: its character fills the creator, and once the Refmods panel has armed its mods
+        each one is a look source or the voice, providing what its role says. Returns armed=False while the
+        pack's mods aren't armed yet."""
+        storage = self._storage()
+        pack = storage.read_pack(name) if storage else None
+        if not pack:
+            return {"ok": False, "note": f"No pack called '{name}'."}
+        self.host.refresh_mods()
+        form = core.clean_form(form)
+        media, _, _, _ = self.resolve(form)
+        mine = [m for m in media if m.pack == name]
+        wanted = [m.get("mod") for m in pack.get("members") or [] if m.get("on", True) is not False]
+        meta = pack.get("subject") if isinstance(pack.get("subject"), dict) else {}
+        kind = {"character": "Character", "location": "Location", "prop": "Prop", "style": "Style"}.get(
+            pack.get("kind"), meta.get("kind") or "Character")
+        fresh = core.subjects_from_media(mine, []) if mine else []
+        if not fresh:
+            subject = core.new_subject(kind)
+            subject["name"] = pack.get("subject_name") or name
+            fresh = [subject]
+        core.apply_pack_meta(fresh[0], meta)
+        if pack.get("subject_name"):
+            fresh[0]["name"] = meta.get("name") or pack["subject_name"]
+        keys = {m.key for m in mine}
+        index = next((i for i, s in enumerate(form["subjects"])
+                      if any(l["key"] in keys for l in s["look"]) or (s.get("voice") and s["voice"] in keys)), None)
+        if index is None:
+            form["subjects"].append(fresh[0])
+            index = len(form["subjects"]) - 1
+        else:
+            form["subjects"][index] = fresh[0]
+        used = {l["key"] for s in form["subjects"] for l in s["look"]}
+        for extra in fresh[1:]:
+            if not any(l["key"] in used for l in extra["look"]):
+                form["subjects"].append(extra)
+        armed = bool(mine) or not wanted
+        note = (f"Loaded the pack '{name}' as {fresh[0]['name'] or 'a subject'}." if armed else
+                f"Filled in '{name}', but its mods aren't armed. Open a MiniMax H3 Ref2VA model on the Generator page "
+                "so the Refmods panel can arm them, then load the pack again.")
+        return {"ok": True, "armed": armed, "form": form, "selected": index, "note": note}
+
+    def save_pack(self, name, subject):
+        """A subject as a pack: its mods (look sources and voice) with their roles and parts, and its character."""
+        storage = self._storage()
+        if storage is None:
+            return {"ok": False, "note": "Packs need the Refmods half of Refmods Studio."}
+        subject = core.clean_subject(subject)
+        name = str(name or "").strip() or subject["name"].strip()
+        if not name:
+            return {"ok": False, "note": "Give the subject a name, or type a name for the pack."}
+        old = storage.read_pack(name) or {}
+        before = {m.get("mod"): dict(m) for m in old.get("members") or []}
+        rows = {r.get("mod"): r for r in self.host.armed_rows()}
+
+        def member(mod):
+            m = dict(before.get(mod) or {})
+            row = rows.get(mod) or {}
+            for key in ("strength", "as_video", "send_as", "use_audio"):
+                if key in row and key not in m:
+                    m[key] = row[key]
+            m.setdefault("strength", 1.0)
+            m["mod"] = mod
+            m.pop("on", None)
+            return m
+
+        members, skipped = [], 0
+        for look in subject["look"]:
+            key = look["key"]
+            if not key.startswith("mod:") or key.endswith(":audio"):
+                skipped += 0 if key.startswith("mod:") else 1
+                continue
+            m = member(key[4:])
+            m.update(role=core.role_for(look, subject["kind"]), parts=list(look["parts"]), sheet=bool(look["sheet"]))
+            members.append(m)
+        voice = subject.get("voice") or ""
+        if voice.startswith("mod:"):
+            mod = voice[4:-len(":audio")] if voice.endswith(":audio") else voice[4:]
+            same = next((m for m in members if m["mod"] == mod), None)
+            if same:
+                same["use_audio"] = True
+            else:
+                m = member(mod)
+                m["role"] = "voice"
+                members.append(m)
+        names = {m["mod"] for m in members}
+        members += [m for mod, m in before.items() if m.get("on", True) is False and mod not in names]
+        pack = {**old, "name": name, "kind": subject["kind"].lower(),
+                "subject_name": subject["name"], "subject": core.pack_meta(subject), "members": members}
+        pack.pop("from_preset", None)
+        try:
+            storage.write_pack(pack)
+        except Exception as exc:                          # noqa: BLE001
+            return {"ok": False, "note": f"Could not save the pack ({exc})."}
+        note = f"{'Updated' if old else 'Saved'} the pack '{name}' with {len(members)} mod(s) and the character."
+        if skipped:
+            note += f" {skipped} picture source(s) from the Generator page aren't mods, so they aren't in it."
+        return {"ok": True, "note": note, "name": name}
 
     # -- the prompt enhancer, as jobs ------------------------------------------------
 

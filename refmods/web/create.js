@@ -74,6 +74,7 @@
     if (added) toast(`Added ${added} file${added === 1 ? "" : "s"}.`);
     renderSources(); changed();
   }
+  const trimmed = (s) => (+s.start || 0) > 0.01 || ((+s.end || 0) && (+s.end) < (+s.seconds || 0) - 0.05);
   function renderSources() {
     let n = 0;
     $("cSources").innerHTML = S.sources.map((s, i) => {
@@ -84,7 +85,8 @@
       const facts = s.kind === "image" ? `${s.width}×${s.height}` : s.kind === "video" ? `${s.width}×${s.height} · ${(+s.seconds || 0).toFixed(1)}s` : `${s.seconds != null ? (+s.seconds).toFixed(1) + "s" : ""}`;
       const tools = s.kind === "image" ? `<div class="row"><button class="small cCrop">Crop</button>${s.orig ? `<span class="muted">cropped</span>` : ""}</div>`
         : s.kind === "video" && S.family === "flux" ? `<span class="muted">the whole video</span>`
-        : s.kind === "video" ? `<div class="trim">Use <input type="number" class="tA" min="0" max="${s.seconds}" step="0.1" value="${s.start}"> to <input type="number" class="tB" min="0" max="${s.seconds}" step="0.1" value="${s.end}"> s</div>` : "";
+        : `<div class="trim">Use <input type="number" class="tA" min="0" max="${s.seconds}" step="0.1" value="${(+s.start || 0).toFixed(1)}"> to <input type="number" class="tB" min="0" max="${s.seconds}" step="0.1" value="${(+s.end || 0).toFixed(1)}"> s</div>
+           <div class="row"><button class="small cTrim">Trim…</button>${trimmed(s) ? `<span class="muted">${(s.end - s.start).toFixed(1)}s kept</span>` : ""}</div>`;
       return `<div class="src" data-i="${i}" draggable="true"><div class="pic">${pic}</div><span class="n">${label}</span>
         <button class="x" title="Remove">×</button><div class="txt"><span class="nm" title="${esc(s.name)}">${esc(s.name)}</span><span class="muted">${esc(facts)}</span>${tools}</div></div>`;
     }).join("");
@@ -92,6 +94,11 @@
       const i = +el.dataset.i, s = S.sources[i];
       el.querySelector(".x").addEventListener("click", () => { S.sources.splice(i, 1); renderSources(); changed(); });
       if (el.querySelector(".cCrop")) el.querySelector(".cCrop").addEventListener("click", () => crop(i));
+      if (el.querySelector(".cTrim")) el.querySelector(".cTrim").addEventListener("click", async () => {
+        const r = await RS.trim({ src: fileUrl(s.token), kind: s.kind, title: "Trim " + s.name, start: s.start, end: s.end || s.seconds,
+                                  duration: s.seconds, min: s.kind === "audio" ? 2 : 0.2 });
+        if (r) { s.start = r.start; s.end = r.end; renderSources(); changed(); }
+      });
       if (el.querySelector(".tA")) {
         const clamp = (v) => Math.max(0, Math.min(+s.seconds || 0, +v || 0));
         el.querySelector(".tA").addEventListener("change", (e) => { s.start = clamp(e.target.value); if (s.end <= s.start) s.end = +s.seconds || s.start; renderSources(); changed(); });

@@ -126,6 +126,30 @@ class BuilderHost:
                 out[m.key] = found[0]
         return out
 
+    def refresh_mods(self):
+        """Read the armed mods again from the captured session state (the Refmods panel may have
+        changed them since the tab was opened, e.g. after Load pack)."""
+        with self._lock:
+            state, settings, model = self.state, dict(self.settings), dict(self.model)
+        if state is None:
+            return
+        inputs = {k: settings.get(k) for k in MEDIA_KEYS}
+        media = core.detect_media(inputs, model, self._mods(state))
+        objects = self._objects(inputs, media)
+        with self._lock:
+            self.media, self.objects = media, objects
+
+    def armed_rows(self) -> list:
+        """The Refmods panel's armed rows (mod, strength, how it's sent), from the session state."""
+        import json
+        with self._lock:
+            state = self.state
+        raw = (state or {}).get("_h3refmod_selection") if isinstance(state, dict) else None
+        try:
+            return list((json.loads(raw) if isinstance(raw, str) else raw or {}).get("rows") or [])
+        except Exception:                              # noqa: BLE001
+            return []
+
     # -- reading ---------------------------------------------------------------
 
     def snapshot(self) -> dict:

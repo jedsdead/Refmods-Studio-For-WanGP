@@ -74,6 +74,18 @@ def _span(source):
     return max(0.0, min(end - start, MAX_CLIP_SECONDS))
 
 
+def _trimmed(source):
+    if not source:
+        return False
+    seconds = float(source.get("seconds") or 0.0)
+    return bool(float(source.get("start") or 0.0) > 0.01 or
+                (source.get("end") and seconds and float(source["end"]) < seconds - 0.05))
+
+
+def audio_source(sources):
+    return next((s for s in sources if s["kind"] == "audio"), None)
+
+
 def _h3_estimate(sources, form):
     """(pictures, clip seconds, tokens, bytes, warnings) for one H3 mod."""
     pictures = clips = tokens = enc_frames = 0
@@ -133,6 +145,9 @@ def _audio_part(sources, form, warnings, has_visual):
         return 0
     if audio:
         real = audio[0].get("seconds")
+        if real is not None and _trimmed(audio[0]):
+            real = _span(audio[0])
+            seconds = real
         if real is not None and real < MIN_AUDIO_SECONDS - 0.05:
             warnings.append(f"The audio is only {real:.1f}s. H3 needs at least {MIN_AUDIO_SECONDS:g}s, so this would "
                             "be refused.")
@@ -261,8 +276,10 @@ def plan(form, sources):
                  for s in group if s["kind"] in ("image", "video")]
         trims = {os.path.basename(paths[s["token"]]): [float(s.get("start") or 0.0),
                                                       float(s.get("end") or s.get("seconds") or MAX_CLIP_SECONDS)]
-                 for s in group if s["kind"] == "video" and (s.get("start") or
-                 (s.get("end") and float(s["end"]) < float(s.get("seconds") or 0) - 0.05))}
+                 for s in group if s["kind"] in ("video", "audio") and _trimmed(s)}
+        audio_seconds = float(form.get("audio_seconds") or DEFAULT_AUDIO_SECONDS)
+        if audio and _trimmed(audio_source(group)):
+            audio_seconds = min(MAX_CLIP_SECONDS, _span(audio_source(group)))
         if family == "flux":
             out.append(("flux", form.get("model"), {
                 "name": name, "images": images, "videos": videos, "order": order,
@@ -287,7 +304,7 @@ def plan(form, sources):
             "video_as_pictures": bool(form.get("video_as_pictures")),
             "pictures_per_second": float(form.get("pictures_per_second") or 1.0),
             "merge": bool(form.get("merge")) and form.get("mode") != "encode",
-            "audio_seconds": max(MIN_AUDIO_SECONDS, float(form.get("audio_seconds") or DEFAULT_AUDIO_SECONDS)),
+            "audio_seconds": max(MIN_AUDIO_SECONDS, audio_seconds),
             "order": order, "clean_audio": bool(form.get("clean_audio")),
         }))
     return out

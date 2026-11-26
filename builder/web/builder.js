@@ -310,6 +310,54 @@
     }, button);
   }
 
+  // ---------------------------------------------------------------- packs
+  // The Refmods panel on the Generator page has a hidden box; writing a pack's name there runs its Add pack.
+  function armPack(name) {
+    try {
+      const doc = window.parent.document;
+      const box = doc.querySelector("#rs-pack-bridge textarea") || doc.querySelector("#rs-pack-bridge input");
+      if (!box) return false;
+      const W = box.ownerDocument.defaultView;
+      const proto = box.tagName === "TEXTAREA" ? W.HTMLTextAreaElement.prototype : W.HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, "value").set.call(box, JSON.stringify({ name, replace: false, at: Date.now() }));
+      box.dispatchEvent(new W.Event("input", { bubbles: true }));
+      box.dispatchEvent(new W.Event("change", { bubbles: true }));
+      return true;
+    } catch (_) { return false; }
+  }
+  let packNames = "";
+  async function loadPacks() {
+    try {
+      const r = await api("packs");
+      const sig = JSON.stringify(r.packs);
+      if (sig === packNames) return;
+      packNames = sig;
+      options($("packSel"), [["", "packs"]].concat(r.packs.map((p) => [p.name, p.name + (p.character ? "" : " (no character yet)")])), $("packSel").value);
+    } catch (_) { /* Refmods is off */ }
+  }
+  async function loadPack() {
+    const name = $("packSel").value;
+    if (!name) { status("Pick a pack first."); return; }
+    const arming = armPack(name);
+    status(arming ? `Arming ${name} in the Refmods panel…` : "Couldn't reach the Refmods panel on the Generator page.");
+    let r = null;
+    for (let i = 0; i < (arming ? 14 : 1); i++) {
+      if (i) await new Promise((ok) => setTimeout(ok, 500));
+      try { r = await api("pack/load", { name, form: S.form }); } catch (err) { status(err.message); return; }
+      if (!r.ok || r.armed) break;
+    }
+    if (!r.ok) { status(r.note); return; }
+    S.form.subjects = r.form.subjects; S.selected = r.selected;
+    drawCards(); drawEditor(); changed(); loadSession(false); status(r.note);
+  }
+  async function savePack() {
+    const subject = S.form.subjects[S.selected];
+    if (!subject) { status("Pick or make a subject first."); return; }
+    const r = await api("pack/save", { name: $("packSel").value || subject.name, subject });
+    status(r.note);
+    if (r.ok) { packNames = ""; await loadPacks(); $("packSel").value = r.name; }
+  }
+
   // ---------------------------------------------------------------- session
   async function loadSession(first) {
     try {
@@ -324,6 +372,7 @@
       }
       options($("loadSel"), [["", "saved prompts"]].concat(s.lists.prompts), $("loadSel").value);
       options($("libSel"), [["", "saved subjects"]].concat(s.lists.subjects), $("libSel").value);
+      loadPacks();
       captureNote();
       if (fresh || first) { drawEditor(); refreshPreview(); }
     } catch (err) { status("Couldn't reach the builder's server: " + err.message); }
@@ -386,6 +435,8 @@
       else { S.form.subjects.push(r.subject); S.selected = S.form.subjects.length - 1; }
       drawCards(); drawEditor(); changed(); status(r.note);
     });
+    $("btnPackLoad").addEventListener("click", loadPack);
+    $("btnPackSave").addEventListener("click", savePack);
     $("btnDraftSubjects").addEventListener("click", async () => {
       const r = await api("draft_subjects", { form: S.form });
       S.form.subjects = r.form.subjects; drawCards(); drawEditor(); changed(); status(r.note);

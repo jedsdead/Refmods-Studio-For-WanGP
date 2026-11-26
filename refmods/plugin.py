@@ -502,6 +502,7 @@ PANEL_CSS = """<style>
 .rs-panel .rs-head { margin-bottom: -4px; }
 .rs-panel .rs-heading { font-size: 11px; opacity: .75; }
 .rs-panel .rs-packrow { gap: 6px !important; align-items: center; flex-wrap: wrap; }
+.rs-panel .rs-hidden { display: none !important; }
 .rs-panel input[type=number] { border: 1px solid var(--border-color-primary) !important;
     border-radius: var(--radius-sm); padding: 4px 6px !important; max-width: 76px; }
 .rs-panel .rs-packrow > button { flex: none !important; min-width: max-content !important; }
@@ -681,7 +682,10 @@ def builder_mod_entries(state):
         for member in pack.get("members") or []:
             in_pack.setdefault(member.get("mod"), {"pack": pack.get("name"), "pack_kind": pack.get("kind"),
                                                    "pack_subject": pack.get("subject") or pack.get("name"),
-                                                   "role": member.get("role") or "generic"})
+                                                   "role": member.get("role") or "generic",
+                                                   "pack_meta": pack.get("meta") or {},
+                                                   "pack_parts": member.get("parts"),
+                                                   "pack_sheet": member.get("sheet")})
     out = []
     for row in payload.get("rows") or []:
         name = row.get("mod")
@@ -1091,6 +1095,8 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
             gr.Markdown("*Packs are sets of mods, each with its role. Pick one and **Add pack** puts it into "
                         "the rows below, beside what's there; **Replace all** clears the rows first. To save "
                         "the rows as a pack, type a name in the box. Your presets are listed as packs.*")
+            pack_bridge = gr.Textbox(value="", elem_id="rs-pack-bridge", elem_classes="rs-hidden",
+                                     show_label=False, container=False, interactive=True)
             # Fork: the full panel (per-row options, sizing, text encoder).
             mod_rows, panel_controls = self._build_mod_picker_rows_full()
             with gr.Row():
@@ -1255,7 +1261,10 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
                     armed = [] if replace else [p for p in _armed_packs(state) if p.get("name") != name]
                     armed.append({"name": name, "kind": pack.get("kind", "mixed"),
                                   "subject": pack.get("subject_name") or "",
-                                  "members": [{"mod": m["mod"], "role": m.get("role") or storage.mod_concept(m["mod"])}
+                                  "meta": pack.get("subject") if isinstance(pack.get("subject"), dict) else {},
+                                  "members": [{"mod": m["mod"], "role": m.get("role") or storage.mod_concept(m["mod"]),
+                                               **({"parts": list(m["parts"])} if isinstance(m.get("parts"), list) else {}),
+                                               **({"sheet": bool(m["sheet"])} if "sheet" in m else {})}
                                               for m in members]})
                     state[ARMED_PACKS_KEY] = armed
                 verb = "replaced the rows with" if replace else "added"
@@ -1267,6 +1276,19 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
                            outputs=[self.state] + load_outputs, queue=False)
             pack_replace.click(fn=lambda st, n, *v: load_pack(st, n, True, *v),
                                inputs=[self.state, pack_box] + row_widgets,
+                               outputs=[self.state] + load_outputs, queue=False)
+
+            # The Prompt Builder's Load pack writes {"name", "replace"} here; the panel loads it as Add pack does.
+            def bridge_load(state, request, *row_vals):
+                try:
+                    req = json.loads(request or "{}")
+                except Exception:
+                    req = {}
+                if not req.get("name"):
+                    return [state] + [gr.update()] * len(load_outputs)
+                return load_pack(state, req["name"], bool(req.get("replace")), *row_vals)
+
+            pack_bridge.change(fn=bridge_load, inputs=[self.state, pack_bridge] + row_widgets,
                                outputs=[self.state] + load_outputs, queue=False)
         else:
             for button in (pack_add, pack_replace):
@@ -1562,7 +1584,7 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
             if getattr(self, "_library_path", None):
                 # .wangp-addon-web-view lets WanGP's full-screen button size the frame.
                 gr.HTML(f'<div class="wangp-addon-web-view"><iframe src="{self._library_path}/?embedded=1" '
-                        'title="Refmods" style="width:100%;height:calc(100vh - 170px);'
+                        'title="Refmods" style="width:100%;height:calc(100vh - 215px);'
                         'min-height:700px;border:0;border-radius:8px" allow="clipboard-write"></iframe></div>')
             else:
                 gr.Markdown("⚠️ **The Refmods app could not start.** The console says why (look for "

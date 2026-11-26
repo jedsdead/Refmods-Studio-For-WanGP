@@ -60,6 +60,104 @@
     return RS.api("upload?name=" + RS.enc(file.name), file, true);
   };
 
+  // ---------------------------------------------------------------- the trim editor (videos and sound)
+  // RS.trim({src, kind: "video"|"audio", title, start, end, min}) -> Promise<{start, end} | null>
+  RS.trim = function (opts) {
+    return new Promise((resolve) => {
+      const dlg = $("trimDlg"), box = $("trimMedia"), tl = $("trimTl"), canvas = $("trimWave");
+      const media = document.createElement(opts.kind === "video" ? "video" : "audio");
+      media.src = opts.src; media.preload = "auto"; media.playsInline = true;
+      box.innerHTML = ""; box.appendChild(media);
+      $("trimTitle").textContent = opts.title || "Trim";
+      const min = opts.min || 0.1;
+      let dur = 0, a = +opts.start || 0, b = +opts.end || 0, stopAt = null, raf = 0, drag = null, done = false;
+      const fmt = (t) => (Math.round(t * 10) / 10).toFixed(1) + " s";
+      const pct = (t) => (dur ? (t / dur) * 100 : 0) + "%";
+      const draw = () => {
+        $("trimSel").style.left = pct(a); $("trimSel").style.width = (dur ? ((b - a) / dur) * 100 : 0) + "%";
+        $("trimIn").style.left = pct(a); $("trimOut").style.left = pct(b);
+        $("trimHead").style.left = pct(media.currentTime || 0);
+        $("trimNow").textContent = fmt(media.currentTime || 0) + " of " + fmt(dur);
+        $("trimInfo").textContent = `Keeping ${fmt(a)} to ${fmt(b)} (${fmt(b - a)})`;
+        if (document.activeElement !== $("trimA")) $("trimA").value = a.toFixed(1);
+        if (document.activeElement !== $("trimB")) $("trimB").value = b.toFixed(1);
+        $("trimPP").textContent = media.paused ? "Play" : "Pause";
+        $("trimOk").disabled = b - a < min - 0.001;
+      };
+      const tick = () => {
+        if (stopAt != null && media.currentTime >= stopAt) { media.pause(); stopAt = null; }
+        draw();
+        if (!media.paused) raf = requestAnimationFrame(tick);
+      };
+      const timeAt = (e) => { const r = tl.getBoundingClientRect(); return Math.max(0, Math.min(dur, ((e.clientX - r.left) / r.width) * dur)); };
+      const setA = (t) => { a = Math.max(0, Math.min(t, b - min)); draw(); };
+      const setB = (t) => { b = Math.min(dur, Math.max(t, a + min)); draw(); };
+      media.addEventListener("loadedmetadata", () => {
+        dur = media.duration && isFinite(media.duration) ? media.duration : (+opts.duration || 0);
+        if (!b || b > dur) b = dur;
+        a = Math.min(a, Math.max(0, b - min));
+        media.currentTime = a;
+        draw();
+      });
+      media.addEventListener("play", () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); });
+      media.addEventListener("pause", draw);
+      media.addEventListener("seeked", draw);
+      // A waveform for sound, so you can see where the words are.
+      const ctx2 = canvas.getContext("2d");
+      ctx2.clearRect(0, 0, canvas.width, canvas.height);
+      if (opts.kind !== "video") {
+        fetch(opts.src).then((r) => r.arrayBuffer()).then((buf) => new (window.AudioContext || window.webkitAudioContext)().decodeAudioData(buf)).then((audio) => {
+          const w = canvas.width = tl.clientWidth * 2, h = canvas.height = tl.clientHeight * 2, data = audio.getChannelData(0);
+          const step = Math.max(1, Math.floor(data.length / w));
+          ctx2.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--muted") || "#9ca3af";
+          for (let x = 0; x < w; x++) {
+            let peak = 0;
+            for (let i = x * step, end = Math.min(data.length, i + step); i < end; i += 4) peak = Math.max(peak, Math.abs(data[i]));
+            const bar = Math.max(1, peak * h * 0.9);
+            ctx2.fillRect(x, (h - bar) / 2, 1, bar);
+          }
+        }).catch(() => { /* no waveform, still trimmable */ });
+      }
+      tl.onpointerdown = (e) => {
+        e.preventDefault(); tl.setPointerCapture(e.pointerId);
+        drag = e.target === $("trimIn") ? "in" : e.target === $("trimOut") ? "out" : "seek";
+        tl.onpointermove(e);
+      };
+      tl.onpointermove = (e) => {
+        if (!drag) return;
+        const t = timeAt(e);
+        if (drag === "in") { setA(t); media.currentTime = a; }
+        else if (drag === "out") { setB(t); media.currentTime = b; }
+        else { media.currentTime = t; draw(); }
+      };
+      tl.onpointerup = () => { drag = null; };
+      $("trimPP").onclick = () => { stopAt = null; if (media.paused) media.play(); else media.pause(); };
+      $("trimPlaySel").onclick = () => { media.currentTime = a; stopAt = b; media.play(); };
+      $("trimSetIn").onclick = () => setA(media.currentTime || 0);
+      $("trimSetOut").onclick = () => setB(media.currentTime || 0);
+      $("trimA").onchange = (e) => setA(+e.target.value || 0);
+      $("trimB").onchange = (e) => setB(+e.target.value || dur);
+      const keys = (e) => {
+        if (e.target.tagName === "INPUT") return;
+        if (e.key === " ") { e.preventDefault(); $("trimPP").click(); }
+        else if (e.key === "i" || e.key === "I") $("trimSetIn").click();
+        else if (e.key === "o" || e.key === "O") $("trimSetOut").click();
+      };
+      const finish = (result) => {
+        if (done) return; done = true;
+        media.pause(); cancelAnimationFrame(raf); dlg.removeEventListener("keydown", keys);
+        if (dlg.open) dlg.close();
+        box.innerHTML = "";
+        resolve(result);
+      };
+      dlg.addEventListener("keydown", keys);
+      dlg.onclose = () => finish(null);
+      $("trimCancel").onclick = () => finish(null);
+      $("trimOk").onclick = () => finish({ start: Math.round(a * 100) / 100, end: Math.round(b * 100) / 100 });
+      dlg.showModal();
+    });
+  };
+
   // ---------------------------------------------------------------- theme: follow WanGP
   RS.theme = function () {
     let dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;

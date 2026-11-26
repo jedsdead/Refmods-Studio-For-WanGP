@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.7.0] — 2026-11-26
+
+- **One Refmods Studio tab.** Refmods and the Prompt Builder are subtabs of it, under one settings fold.
+- **Scrub and trim.** A trim editor for videos and audio has a player, a timeline you can click or drag through, in
+  and out handles, Set in and Set out at the playhead (I and O), and Play the selection. Sound gets a waveform.
+  - On the Create page it's on every video and audio card. A trimmed audio file now starts at its trim, as a
+    clip's sound already did, and keeps the trim's length.
+  - In the Library, **Choose in and out…** trims a decoded voice or soundtrack.
+- **Packs in the Prompt Builder.** A pack can hold a character, with the character creator's fields.
+  - **Load pack** arms the pack's mods in the Refmods panel and fills in the subject. Each mod becomes a look source
+    providing what its role says (or what was saved with it), and a voice mod becomes the voice.
+  - **Save as pack** saves the selected subject's character, its mods and what each one provides.
+  - The **Packs** page edits the character too.
+- A pack's voice mod is now the subject's voice, rather than a face video's own soundtrack.
+- Prompt Builder: only **Time** writes a timestamp. Dialogue lines no longer start with one, and **Shot** writes just
+  `[Shot N]`.
+
 ## [0.6.0] — 2026-11-26
 
 - **The Refmods tab is one web app** with four pages, Library, Create, Packs and Setup, and one MiniMax H3 model

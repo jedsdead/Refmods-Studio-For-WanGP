@@ -1610,7 +1610,7 @@ class H3PromptBuilderPlugin(WAN2GPPlugin):
         if self._web_host is not None:
             # .wangp-addon-web-view lets WanGP's full-screen button size the frame.
             gr.HTML(f'<div class="wangp-addon-web-view"><iframe src="{self._web_path}/?embedded=1" '
-                    'title="Prompt Builder" style="width:100%;height:calc(100vh - 150px);min-height:720px;'
+                    'title="Prompt Builder" style="width:100%;height:calc(100vh - 215px);min-height:700px;'
                     'border:0;border-radius:8px" allow="clipboard-write"></iframe></div>')
             return
         if self._studio_ui is not None:

@@ -5,6 +5,12 @@
   const RS = window.RS, $ = RS.$, esc = RS.esc, api = RS.api, act = RS.act, toast = RS.toast;
   const S = { packs: [], roles: [], kinds: [], edit: null, original: null, dirty: false, q: "", mq: "" };
   const SEND_AS = [["pictures", "pictures"], ["video", "one video"], ["sheet", "contact sheet"]];
+  // The Prompt Builder's character creator, saved with the pack.
+  const CHARACTER = [["name", "Name"], ["gender", "Gender"], ["age", "Age"], ["ethnicity", "Ethnicity"], ["height", "Height"],
+                     ["build", "Build"], ["hairstyle", "Hairstyle"], ["haircolor", "Hair colour"], ["eyecolor", "Eye colour"],
+                     ["accent", "Accent"], ["clothing", "Clothing"], ["details", "Other details"]];
+  const GENDERS = ["", "woman", "man", "girl", "boy", "person"];
+  let charOpen = false;
 
   async function reload(keepName) {
     const data = await api("packs");
@@ -70,6 +76,12 @@
       <div class="grid2"><label class="fld">Subject name in the Prompt Builder<input id="pSubject" value="${esc(p.subject_name || "")}" placeholder="${esc(p.name || "the pack's name")}"></label>
         <label class="fld">Description<input id="pDesc" value="${esc(p.description || "")}"></label></div>
       <p class="explain">In the Refmods panel, <b>Add pack</b> loads the mods that are on, with these settings. In the Prompt Builder, <b>Draft subjects</b> turns a character pack into one subject, each mod providing what its role says. A mixed pack is just a set of mods.</p>
+      <details class="sec" id="pChar"${charOpen ? " open" : ""}><summary>Character <span class="hint">${p.subject && Object.keys(p.subject).length ? "filled in" : "for the Prompt Builder's Load pack"}</span></summary><div class="secbody">
+        <p class="explain">What <b>Load pack</b> in the Prompt Builder fills in. Save a subject there as a pack to fill this from the character creator.</p>
+        <div class="grid3">${CHARACTER.map(([k, label]) => k === "gender"
+          ? `<label class="fld">${label}<select data-ch="gender">${GENDERS.map((g) => `<option value="${g}"${g === ((p.subject || {}).gender || "") ? " selected" : ""}>${g || "—"}</option>`).join("")}</select></label>`
+          : `<label class="fld"${k === "details" || k === "clothing" ? ' style="grid-column: span 3"' : ""}>${label}<input data-ch="${k}" value="${esc((p.subject || {})[k] || "")}"></label>`).join("")}</div>
+      </div></details>
       <div class="members">${p.members.length ? head + rows : `<div class="empty-detail">No mods yet. Click mods on the right to add them.</div>`}</div>
       <div class="row"><button id="pSave" class="primary"${S.dirty || !S.original ? "" : " disabled"}>Save</button>
         <button id="pUndo"${S.dirty ? "" : " disabled"}>Undo changes</button>
@@ -80,6 +92,12 @@
     $("pKind").addEventListener("change", (e) => { p.kind = e.target.value; touch(); });
     $("pSubject").addEventListener("input", (e) => { p.subject_name = e.target.value; touch(); });
     $("pDesc").addEventListener("input", (e) => { p.description = e.target.value; touch(); });
+    $("pChar").addEventListener("toggle", (e) => { charOpen = e.target.open; });
+    box.querySelectorAll("[data-ch]").forEach((el) => el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => {
+      p.subject = Object.assign({}, p.subject || {}, { [el.dataset.ch]: el.value });
+      if (!p.subject.kind) p.subject.kind = { location: "Location", prop: "Prop", style: "Style" }[p.kind] || "Character";
+      touch();
+    }));
     box.querySelectorAll(".member").forEach((el) => {
       const i = +el.dataset.i, m = p.members[i];
       el.querySelector(".mRole").addEventListener("change", (e) => { m.role = e.target.value; touch(); });

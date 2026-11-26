@@ -1,12 +1,12 @@
 # Refmods Studio
 
-Refmods and the MiniMax H3 Prompt Builder in one WanGP plugin.
+Refmods and the MiniMax H3 Prompt Builder in one WanGP plugin, on one **Refmods Studio** tab with a subtab for each.
 
 - **Refmods**: no-training reference mods for MiniMax H3 (Ref2VA, FL2VA, FL2VA ControlNet, H3-Image, P-H3-Image)
   and Flux 2 / Flux 3. Compress a reference into a small `.safetensors` file once, then reuse it at any strength
   without re-encoding it every generation.
 - **Prompt Builder**: builds MiniMax H3 prompts (T2VA, I2VA, FL2VA, L2VA, Ref2VA) from a form, inline under the
-  prompt box and on its own tab, with an optional panel that writes the prompt with WanGP's prompt enhancer and
+  prompt box and on its own subtab, with an optional panel that writes the prompt with WanGP's prompt enhancer and
   Deepy tools for H3 prompts.
 
 The Refmods half started as Refmods For Wan GP `0.38.1-fork.58`; its guide, for how mods work, is in [`docs/refmods.md`](docs/refmods.md).
@@ -16,7 +16,7 @@ The Prompt Builder was reworked in 0.2 (below). The 4.x builder's guide is kept 
 ## The Prompt Builder
 
 Load your references on the Generator page as usual (start and end images, reference images, videos, audio) and arm
-any mods in the Refmods panel. The **Prompt Builder** tab reads them:
+any mods in the Refmods panel. The **Prompt Builder** subtab reads them:
 
 - **Mode** is picked from what's loaded, and the buttons override it.
 - **What this generation sends** lists every label the pipeline will give, in its order. Click one to insert it
@@ -24,12 +24,13 @@ any mods in the Refmods panel. The **Prompt Builder** tab reads them:
 - **Subjects**: name and describe each one with the character creator, then say where its look comes from (a
   picture, a mod, or the description only) and its voice (an audio reference, a voice mod, or gender and tone). In
   Reference mode they write `subject_definitions` and `retention_analysis` in the bundled H3 guide's wording.
-- **Insert**: Shot, Camera, Subject and Dialogue write the guide's notation at the cursor.
+- **Insert**: Shot, Camera, Subject and Dialogue write the guide's notation at the cursor. Only **Time** writes a
+  timestamp, so a line or a shot has one only where you put it.
 - **Enhance** on Action, Sound and Music asks the prompt enhancer set in Configuration to write that box.
 - The **live preview** shows the finished prompt, with the checks under it. **Insert into prompt** and **Append
   window** put it in the prompt box.
 
-The builder reads the Generator page each time you open its tab, so load your references and arm your mods first.
+The builder reads the Generator page each time you open the Refmods Studio tab, so load your references and arm your mods first.
 **Check the prompt box** checks whatever is in the Generator page's prompt box.
 
 ## Packs
@@ -40,22 +41,27 @@ into the rows, or **Replace all** to start from it. Type a name and **Save as pa
 Builder, **Draft subjects** turns a character pack into one subject, each mod providing what its role says. Your old
 presets are listed as packs.
 
-## The Refmods tab
+A pack can also hold a character: the fields of the Prompt Builder's character creator. In the Prompt Builder, pick a
+pack and **Load pack**: the Refmods panel arms its mods (with their strengths and labels) and the builder fills in the
+subject, with each mod as a look source or the voice. **Save as pack** does the reverse: it saves the selected
+subject's character, its mods and what each provides. The **Packs** page can edit the character too.
 
-The Refmods tab is one app with four pages. The **MiniMax H3 model** at the top is the one every job runs on:
+## The Refmods subtab
+
+The Refmods subtab is one app with four pages. The **MiniMax H3 model** at the top is the one every job runs on:
 creating, decoding, strength previews, encoder frames and soundtracks.
 
 - **Library** holds every H3 and Flux mod. Pick a folder or pack on the left, search and filter at the top, and click
   a mod to see what's stored in it.
   - Rename or move it, edit its description and concept, or save a copy.
-  - **Edit pictures** drops or reorders a picture mod's pictures. **Trim** a voice or soundtrack, or remove one.
+  - **Edit pictures** drops or reorders a picture mod's pictures. **Trim** a voice or soundtrack (scrub through it to set the in and out points), or remove one.
     Neither re-encodes anything, so they're instant.
   - What needs the model runs as a short task: **Decompile**, **Strength preview** (the first picture at a few
     strengths), **Decode to listen**, encoder frames, soundtracks, **Clean audio** and **Convert to Flux**.
   - **Replace preview** sets the picture shown for a mod. The mod itself doesn't change.
   - Ctrl-click or tick several to move, add to a pack, update or delete them together, or drag them onto a folder.
 - **Create** makes mods for MiniMax H3 or Flux. Drop pictures, videos or an audio file, drag them into order, crop
-  pictures and trim videos. Make one mod from all of them or one per picture or video, at **Full** (exact, best
+  pictures, and scrub through videos and audio to set in and out points. Make one mod from all of them or one per picture or video, at **Full** (exact, best
   for faces) or **Compressed** (smaller). The estimate shows the tokens and file size, and **Create** stays locked
   until the mod can be made. Every option from the old Extract tabs is under **Advanced**.
 - **Packs** edits packs: their mods, each one's role, strength (up to 2), how it's sent, its sound, and an **On**
@@ -86,7 +92,7 @@ Nothing needs moving:
 
 ## Settings
 
-Each tab has a **Refmods Studio settings** fold at the top. Untick **Refmods** or **Prompt Builder** to hide that
+The Refmods Studio tab has a **Refmods Studio settings** fold at the top. Untick **Refmods** or **Prompt Builder** to hide that
 half completely, then restart WanGP. A half that's off isn't loaded at all: turning off Refmods also removes its
 pipeline hooks.
 

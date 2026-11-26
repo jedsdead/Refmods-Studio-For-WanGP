@@ -499,7 +499,10 @@ def upload_path(token):
 
 # -- packs ---------------------------------------------------------------------------------
 
-PACK_FIELDS = ("mod", "role", "strength", "on", "as_video", "send_as", "use_audio", "label", "audio_label")
+PACK_FIELDS = ("mod", "role", "strength", "on", "as_video", "send_as", "use_audio", "label", "audio_label",
+               "parts", "sheet")
+CHARACTER_FIELDS = ("kind", "name", "gender", "age", "ethnicity", "height", "build", "hairstyle", "haircolor",
+                    "eyecolor", "clothing", "details", "accent")
 
 
 def packs():
@@ -545,6 +548,12 @@ def save_pack(pack, old_name=None):
     data = {**old, "name": name, "kind": pack.get("kind") if pack.get("kind") in storage.PACK_KINDS else "mixed",
             "subject_name": str(pack.get("subject_name") or "").strip(),
             "description": str(pack.get("description") or "").strip(), "members": members}
+    if isinstance(pack.get("subject"), dict):
+        character = {k: str(v).strip() for k, v in pack["subject"].items() if k in CHARACTER_FIELDS and str(v or "").strip()}
+        if character:
+            data["subject"] = character
+        else:
+            data.pop("subject", None)
     data.pop("from_preset", None)
     storage.write_pack(data)
     if old_name and old_name != name:

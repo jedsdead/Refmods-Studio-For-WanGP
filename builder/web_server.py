@@ -104,6 +104,18 @@ def create_app(plugin, host):
     def save_subject(payload: dict = Body(...)):
         return service.save_subject(payload.get("subject") or {})
 
+    @app.get("/api/packs")
+    def packs():
+        return {"packs": service.pack_list()}
+
+    @app.post("/api/pack/load")
+    def load_pack(payload: dict = Body(...)):
+        return service.load_pack(payload.get("name"), payload.get("form") or {})
+
+    @app.post("/api/pack/save")
+    def save_pack(payload: dict = Body(...)):
+        return service.save_pack(payload.get("name"), payload.get("subject") or {})
+
     @app.post("/api/jobs")
     def start_job(payload: dict = Body(...)):
         kind = "write" if payload.get("kind") == "write" else "enhance"

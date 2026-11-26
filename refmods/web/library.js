@@ -265,7 +265,7 @@
              <div class="row"><button data-job="decompile">${busy("decompile") ? "Decoding…" : "Decode to listen"}</button></div>`}
         <div class="row"><label class="inline">Keep from <input type="number" id="trA" class="num" min="0" max="${len}" step="0.1" value="0"></label>
           <label class="inline">to <input type="number" id="trB" class="num" min="0" max="${len}" step="0.1" value="${len}"> s</label>
-          ${audioFile ? `<button id="trMark" class="small" title="Set the start or end to where the player is">Use player time</button>` : ""}</div>
+          ${audioFile ? `<button id="trPick" class="small" title="Scrub through it and set the in and out points">Choose in and out…</button>` : `<span class="muted small">Decode it to scrub through it.</span>`}</div>
         <div class="row"><button id="trCopy">Trim as copy</button><button id="trSave">Trim this mod</button><span class="muted small">no re-encoding · at least 2 s</span></div>
         <div class="row"><button data-job="clean_audio" title="Keeps voices only; music and effects go">Clean audio</button>
           <label class="inline"><input type="checkbox" id="cleanCopy" checked> as a copy</label>
@@ -351,9 +351,10 @@
       const trim = (copy) => act(api("trim_audio", { id: it.id, start: +$("trA").value, end: +$("trB").value, as_copy: copy }), afterEdit);
       $("trCopy").addEventListener("click", () => trim(true));
       RS.armed($("trSave"), () => trim(false));
-      if ($("trMark")) $("trMark").addEventListener("click", () => {
-        const t = +$("voicePlayer").currentTime.toFixed(1);
-        if (t < +$("trB").value / 2 || !+$("trA").value) $("trA").value = t; else $("trB").value = t;
+      if ($("trPick")) $("trPick").addEventListener("click", async () => {
+        const r = await RS.trim({ src: outUrl(it, d.outputs.audios[0]), kind: "audio", title: "Trim " + it.leaf,
+                                  start: +$("trA").value, end: +$("trB").value, duration: d.audio_seconds, min: 2 });
+        if (r) { $("trA").value = r.start.toFixed(2); $("trB").value = r.end.toFixed(2); }
       });
       if ($("sndRemove")) RS.armed($("sndRemove"), () => act(api("trim_audio", { id: it.id, remove: true, as_copy: false }), afterEdit));
     }

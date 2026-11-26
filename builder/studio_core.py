@@ -134,6 +134,9 @@ class Media:
     pack_kind: str = ""
     pack_subject: str = ""
     pack_role: str = ""        # its role in that pack (identity, clothing, voice...)
+    pack_parts: list = None    # what it provides, saved from the builder with the pack
+    pack_sheet: bool = None    # a reference sheet, saved the same way
+    pack_meta: dict = None     # the pack's character, as the creator fills it
 
     @property
     def label_text(self) -> str:
@@ -247,7 +250,10 @@ def detect_media(inputs: dict, model: dict, mods: list) -> list[Media]:
                          mod.get("label") or None, bool(mod.get("sheet")), str(mod.get("description") or ""),
                          concept=str(mod.get("concept") or ""), pack=str(mod.get("pack") or ""),
                          pack_kind=str(mod.get("pack_kind") or ""), pack_subject=str(mod.get("pack_subject") or ""),
-                         pack_role=str(mod.get("role") or "")))
+                         pack_role=str(mod.get("role") or ""),
+                         pack_parts=[p for p in mod.get("pack_parts") or [] if p in PARTS] or None,
+                         pack_sheet=mod.get("pack_sheet") if isinstance(mod.get("pack_sheet"), bool) else None,
+                         pack_meta=dict(mod.get("pack_meta")) if isinstance(mod.get("pack_meta"), dict) else None))
     assign_labels(out)
     return out
 
@@ -789,7 +795,7 @@ def shot_snippet(action: str, at) -> str:
     shots = shots_of(action)
     if not shots:
         return "[Shot 1] "
-    return f"[Shot {shots[-1][0] + 1}] At {timestamp(at)}, the camera cuts to "
+    return f"[Shot {shots[-1][0] + 1}] "   # only the Time button writes a time
 
 
 def camera_snippet(move: str, amplitude: str = "", speed: str = "") -> str:
@@ -944,11 +950,14 @@ def subjects_from_media(media: list, existing: list) -> list:
         subject = new_subject({"character": "Character", "location": "Location", "prop": "Prop",
                                "style": "Style"}[kind])
         subject["name"] = members[0].pack_subject or name
+        apply_pack_meta(subject, members[0].pack_meta)
+        # A voice mod in the pack is the voice; a mod's own soundtrack only when there's none.
+        voices = sorted((m for m in members if m.kind == "audio"), key=lambda m: m.key.endswith(":audio"))
+        if kind == "character" and voices:
+            subject["voice"] = voices[0].key
         for m in members:
             done.add(m.key)
             if m.kind == "audio":
-                if kind == "character" and not subject["voice"]:
-                    subject["voice"] = m.key
                 continue
             role = m.pack_role or m.concept or "generic"
             if kind == "character" and role in ROLE_KINDS:
@@ -958,8 +967,12 @@ def subjects_from_media(media: list, existing: list) -> list:
                 out.append(extra)
                 continue
             parts = ROLE_PARTS.get(role, list(DEFAULT_PARTS)) if kind == "character" else list(DEFAULT_PARTS)
-            subject["look"].append({"key": m.key, "parts": list(parts),
-                                    "sheet": role == "reference sheet" or m.sheet})
+            sheet = role == "reference sheet" or m.sheet
+            if m.pack_parts:
+                parts = m.pack_parts
+            if m.pack_sheet is not None:
+                sheet = m.pack_sheet
+            subject["look"].append({"key": m.key, "parts": list(parts), "sheet": bool(sheet)})
         subject["look"] = subject["look"][:MAX_LOOKS]
         out.insert(0, subject)
     for m in fresh:
@@ -976,3 +989,46 @@ def subjects_from_media(media: list, existing: list) -> list:
             done.add(voice.key)
         out.append(subject)
     return out
+
+
+# -- a pack's character -------------------------------------------------------------------
+
+META_KEYS = ("name", "gender", "age", "ethnicity", "height", "build", "hairstyle", "haircolor", "eyecolor",
+             "clothing", "details", "accent")
+
+
+def apply_pack_meta(subject: dict, meta) -> dict:
+    """The character saved with a pack, over a subject (empty values leave the subject's own)."""
+    if isinstance(meta, dict):
+        for key in META_KEYS:
+            value = meta.get(key)
+            if value not in (None, ""):
+                subject[key] = value
+        if meta.get("kind") in KINDS:
+            subject["kind"] = meta["kind"]
+    return subject
+
+
+def pack_meta(subject: dict) -> dict:
+    """What a pack keeps of a subject: the creator's fields, not its sources."""
+    subject = clean_subject(subject)
+    out = {k: subject[k] for k in META_KEYS if subject.get(k) not in (None, "")}
+    out["kind"] = subject["kind"]
+    return out
+
+
+def role_for(look: dict, kind: str) -> str:
+    parts = set(look.get("parts") or [])
+    if kind == "Location":
+        return "background"
+    if kind == "Style":
+        return "style"
+    if kind == "Prop":
+        return "generic"
+    if look.get("sheet"):
+        return "reference sheet"
+    if parts == {"clothing"}:
+        return "clothing"
+    if parts == {"movement"}:
+        return "pose_motion"
+    return "identity"
