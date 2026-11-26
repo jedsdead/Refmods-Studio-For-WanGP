@@ -196,7 +196,7 @@ def details(mod_id):
         if not item["usable"]:
             facts.append(("Warning", "not a Flux 2 latent, so it won't load"))
         return {"item": item, "facts": facts, "frames": [], "tags": [], "outputs": _outputs(model, name),
-                "strength": []}
+                "strength": [], "pictures": 0, "audio_seconds": 0}
     meta, keys = _h3_header(name)
     if meta is None:
         raise FileNotFoundError(name)
@@ -237,8 +237,11 @@ def details(mod_id):
                                      else f"{float(times[i]):.1f}s" if i < len(times) else str(i + 1))}
               for i in range(item["frames"])]
     tags = [t for t in meta.get("tags") or [] if core.parse_source_counts(t) is None]
+    editable = (kind == "image" and latent_t > 1 and meta.get("source") != "merge")
+    audio_t = latent_t if kind == "audio" else int(meta.get("audio_t") or 0)
     return {"item": item, "facts": facts, "frames": frames, "tags": tags, "outputs": _outputs(model, name),
-            "strength": _strength_outputs(name)}
+            "strength": _strength_outputs(name), "pictures": latent_t if editable else 0,
+            "audio_seconds": round(audio_t / AUDIO_LATENTS_PER_SECOND, 2) if audio_t else 0}
 
 
 def _outputs(model, name):
@@ -494,6 +497,181 @@ def upload_path(token):
     return path if os.path.isfile(path) else None
 
 
+# -- packs ---------------------------------------------------------------------------------
+
+PACK_FIELDS = ("mod", "role", "strength", "on", "as_video", "send_as", "use_audio", "label", "audio_label")
+
+
+def packs():
+    out = []
+    for name in storage.list_packs():
+        pack = storage.read_pack(name)
+        if pack:
+            out.append(pack)
+    return {"packs": out, "roles": list(storage.PACK_ROLES), "kinds": list(storage.PACK_KINDS)}
+
+
+def _clean_member(m):
+    m = {k: v for k, v in dict(m).items() if k in PACK_FIELDS}
+    m["mod"] = str(m.get("mod") or "").strip()
+    try:
+        m["strength"] = max(0.0, min(2.0, float(m.get("strength", 1.0))))
+    except (TypeError, ValueError):
+        m["strength"] = 1.0
+    send_as = m.pop("send_as", None) or ("video" if m.get("as_video") else "pictures")
+    m["as_video"] = send_as == "video"
+    if send_as == "sheet":
+        m["send_as"] = "sheet"
+    m["use_audio"] = m.get("use_audio", True) is not False
+    if m.get("on", True) is not False:
+        m.pop("on", None)
+    else:
+        m["on"] = False
+    if m.get("role") not in storage.PACK_ROLES:
+        m.pop("role", None)
+    return m
+
+
+def save_pack(pack, old_name=None):
+    pack = dict(pack or {})
+    name = str(pack.get("name") or "").strip()
+    if not name:
+        raise ValueError("give the pack a name")
+    storage._pack_file(name)                       # refuses a name that sanitizes to nothing
+    members = [_clean_member(m) for m in pack.get("members") or [] if str(m.get("mod") or "").strip()]
+    if old_name and old_name != name and storage.read_pack(name):
+        raise ValueError(f"a pack called '{name}' already exists")
+    old = storage.read_pack(old_name or name) or {}
+    data = {**old, "name": name, "kind": pack.get("kind") if pack.get("kind") in storage.PACK_KINDS else "mixed",
+            "subject_name": str(pack.get("subject_name") or "").strip(),
+            "description": str(pack.get("description") or "").strip(), "members": members}
+    data.pop("from_preset", None)
+    storage.write_pack(data)
+    if old_name and old_name != name:
+        storage.delete_pack(old_name)
+    return {"ok": True, "name": name, "message": f"Saved the pack '{name}' ({len(members)} mod(s))."}
+
+
+def delete_pack(name):
+    ok = storage.delete_pack(name)
+    return {"ok": ok, "message": f"Deleted the pack '{name}'." if ok else "No such pack."}
+
+
+def add_to_pack(name, ids, new=False, kind="mixed"):
+    name = str(name or "").strip()
+    if not name:
+        raise ValueError("give the pack a name")
+    mods = [split_id(i)[1] for i in ids if split_id(i)[0] == "h3"]
+    if not mods:
+        raise ValueError("packs hold MiniMax H3 mods; pick at least one")
+    pack = storage.read_pack(name)
+    if new and pack:
+        raise ValueError(f"a pack called '{name}' already exists")
+    pack = pack or {"name": name, "kind": kind, "members": []}
+    have = {m.get("mod") for m in pack["members"]}
+    added = [m for m in mods if m not in have]
+    pack["members"] = list(pack["members"]) + [{"mod": m, "strength": 1.0, "role": storage.mod_concept(m)}
+                                               for m in added]
+    storage.write_pack(pack)
+    return {"ok": True, "name": name,
+            "message": f"Added {len(added)} mod(s) to the pack '{name}'." if added else "They're already in it."}
+
+
+# -- edits that need no model: they cut the stored latents ------------------------------------
+
+def _save_mod(mod, name):
+    gc.collect()
+    final = storage.mod_path(name)
+    tmp = final + "__saving"
+    mod.save(tmp)
+    os.replace(tmp + ".safetensors", final + ".safetensors")
+
+
+def _edit_target(name, as_copy, suffix):
+    if not as_copy:
+        return name
+    return storage.free_mod_name(name, suffix)
+
+
+def edit_pictures(mod_id, keep, as_copy=True):
+    """Keep some of a picture mod's pictures, in a new order. Each picture is its own
+    latent frame, so nothing is encoded again."""
+    model, name = split_id(mod_id)
+    if model != "h3":
+        raise ValueError("only MiniMax H3 mods can be edited here")
+    mod = storage.load_refmod(name)
+    total = int(mod.latent.shape[2])
+    if mod.kind == "audio" or not (mod.kind == "image" or mod.still_stack()) or total < 2:
+        raise ValueError("this mod has no separate pictures to edit")
+    keep = [int(i) for i in keep or [] if 0 <= int(i) < total]
+    if not keep:
+        raise ValueError("keep at least one picture")
+    if keep == list(range(total)):
+        return {"ok": True, "id": mod_id, "message": "Nothing changed."}
+    mod.latent = mod.latent[:, :, keep].contiguous()
+    mod.latent_t = len(keep)
+    note = ""
+    if mod.enc_frames is not None and int(mod.enc_frames.shape[0]) == total:
+        mod.enc_frames = mod.enc_frames[keep].contiguous()
+        mod.enc_times = [float(i) for i in range(len(keep))]
+    elif mod.enc_frames is not None:
+        mod.enc_frames, mod.enc_times = None, []
+        note = " Its encoder frames didn't match the pictures, so they were left out; store them again."
+    mod.tags = [t for t in mod.tags or [] if core.parse_source_counts(t) is None] + ["edited pictures"]
+    target = _edit_target(name, as_copy, "_edit")
+    if target != name:
+        mod.name = target.split("/")[-1]
+    _save_mod(mod, target)
+    if target != name:
+        _follow("h3", name, target, copy=True)
+    return {"ok": True, "id": make_id("h3", target),
+            "message": f"Kept {len(keep)} of {total} pictures" + (f", saved as '{target}'." if target != name else ".") + note}
+
+
+def trim_audio(mod_id, start, end, as_copy=True, remove=False):
+    """Trim a voice or soundtrack, or remove a soundtrack. The audio latent is cut, not re-encoded."""
+    model, name = split_id(mod_id)
+    if model != "h3":
+        raise ValueError("only MiniMax H3 mods have sound")
+    mod = storage.load_refmod(name)
+    latent = mod.latent if mod.kind == "audio" else mod.audio_latent
+    if latent is None:
+        raise ValueError("this mod has no sound")
+    target = _edit_target(name, as_copy, "_edit")
+    if remove:
+        if mod.kind == "audio":
+            raise ValueError("an audio mod is all sound; delete it instead")
+        mod.audio_latent, mod.audio_t = None, 0
+        message = "Soundtrack removed"
+    else:
+        total = int(latent.shape[-1])
+        a = max(0, int(round(float(start or 0) * AUDIO_LATENTS_PER_SECOND)))
+        b = min(total, int(round(float(end if end is not None else total / AUDIO_LATENTS_PER_SECOND)
+                                 * AUDIO_LATENTS_PER_SECOND)))
+        if b - a < 2 * AUDIO_LATENTS_PER_SECOND:
+            raise ValueError("keep at least 2 seconds; H3 refuses shorter audio")
+        if a == 0 and b == total:
+            return {"ok": True, "id": mod_id, "message": "Nothing changed."}
+        cut = latent[..., a:b].contiguous()
+        if mod.kind == "audio":
+            mod.latent, mod.latent_t = cut, int(cut.shape[-1])
+        else:
+            mod.audio_latent, mod.audio_t = cut, int(cut.shape[-1])
+        message = f"Kept {a / AUDIO_LATENTS_PER_SECOND:.1f}s to {b / AUDIO_LATENTS_PER_SECOND:.1f}s"
+    if target != name:
+        mod.name = target.split("/")[-1]
+    _save_mod(mod, target)
+    if target != name:
+        _follow("h3", name, target, copy=True)
+    else:
+        for f in ("audio.wav", "soundtrack.wav"):            # the old decode no longer matches
+            path = os.path.join(storage.decompile_dir(name), f)
+            if os.path.isfile(path):
+                os.remove(path)
+    return {"ok": True, "id": make_id("h3", target),
+            "message": message + (f", saved as '{target}'." if target != name else ".")}
+
+
 # -- jobs (they need the model's VAEs, so they run as WanGP tasks) ----------------------
 
 class Jobs:
@@ -539,7 +717,7 @@ class Jobs:
         if session is None:
             raise RuntimeError("open the Refmods tab once first, so WanGP hands the plugin its session")
         if not model_type:
-            raise RuntimeError("pick a MiniMax H3 model at the top of the Library")
+            raise RuntimeError("pick a MiniMax H3 model at the top first")
         job = self
 
         class Callbacks:
@@ -590,6 +768,8 @@ class Jobs:
                                                     "as_copy": bool(payload.get("as_copy", True))})
                 elif op == "convert":
                     self._convert(record, model_type, names, payload)
+                elif op == "create":
+                    self._create(record, payload)
                 else:
                     raise RuntimeError(f"unknown job {op!r}")
                 with self.lock:
@@ -602,6 +782,37 @@ class Jobs:
                     record["state"] = "error"
                     record["message"] = f"Failed: {exc}"
                     record["lines"].append(record["message"])
+
+    def _create(self, record, payload):
+        """Create page: one extraction task per mod to make."""
+        from . import create_service, flux_ui
+        made, failed = [], []
+        for family, model, spec in create_service.plan(payload.get("form") or {}, payload.get("sources") or []):
+            if not model:
+                raise RuntimeError("pick a " + ("Flux" if family == "flux" else "MiniMax H3") + " model first")
+            if family == "flux":
+                ok, message = flux_ui.submit_extract(self.plugin, self.session(), model, spec)
+                self._say(record, message)
+                (made if ok else failed).append(f"flux:{spec['name']}")
+                continue
+            before = len(record["lines"])
+            self._task(record, model, spec)
+            lines = record["lines"][before:]
+            refused = [l for l in lines if "refused" in l.lower()]
+            if refused:
+                failed.append(f"h3:{spec['name']}")
+                self._say(record, refused[-1])
+            elif spec.get("save", True):
+                made.append(f"h3:{spec['name']}")
+        with self.lock:
+            record["made"] = made
+        names = ", ".join(m.split(":", 1)[1] for m in made)
+        if made:
+            self._say(record, f"Made {len(made)} mod(s): {names}." + (f" {len(failed)} failed." if failed else ""))
+        elif payload.get("form", {}).get("save", True) is False:
+            self._say(record, "Test run finished; nothing was saved.")
+        else:
+            raise RuntimeError(record["message"] or "nothing was made; see the console")
 
     def _convert(self, record, model_type, names, payload):
         from . import flux_ui

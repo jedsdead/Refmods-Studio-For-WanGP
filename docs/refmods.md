@@ -1,5 +1,12 @@
 # Refmods For Wan GP
 
+> **In Refmods Studio the Refmods tab has changed.** This is the guide to Refmods For Wan GP as it was before.
+> The tab is now one app with four pages; see the README. Where this guide names the old tabs:
+> **Extract (H3)** and **Extract (Flux)** are now **Create** (*training* mode is **Compressed**, *encode* is **Full**);
+> **Library** and **Decompile** are the **Library**; **Auto-arm** and *Check setup for this model* are **Setup**.
+> The **Generate** tab is gone: use the Generator page with the **Refmods: MiniMax H3** panel. Presets are now packs.
+> Everything below about how mods work, the panel's options and the models still applies.
+
 **Version 0.38.1-fork.58** · built on the original port's 0.38.1 · repo: https://github.com/jedsdead/Refmod-Fork
 
 Reference mods for MiniMax H3 and Flux in Wan2GP. In Wan2GP it shows as the

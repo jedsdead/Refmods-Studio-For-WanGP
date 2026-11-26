@@ -1,0 +1,161 @@
+/* Refmods Studio: what the Refmods pages share. Helpers, the theme, the subtabs, the MiniMax H3 model picker and
+   the jobs that run on the model. Each page (library.js, create.js, packs.js, setup.js) registers itself in RS.views. */
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const RS = window.RS = { $, views: {}, session: null, jobDone: [], watch: {} };
+
+  RS.esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  RS.enc = encodeURIComponent;
+  RS.api = async function (path, body, raw) {
+    const opts = body === undefined ? {} : raw ? { method: "POST", body } :
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+    const res = await fetch("api/" + path, opts);
+    let data = null;
+    try { data = await res.json(); } catch (_) { data = null; }
+    if (!res.ok || (data && data.ok === false && data.message && res.status >= 400)) {
+      throw new Error((data && data.message) || res.status + " " + res.statusText);
+    }
+    return data;
+  };
+  let toastTimer = 0;
+  RS.toast = function (text, bad) {
+    const t = $("toast");
+    t.textContent = text || ""; t.className = "toast show" + (bad ? " err" : "");
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.className = "toast"; }, bad ? 6000 : 3500);
+  };
+  RS.act = async function (promise, after) {
+    try {
+      const r = await promise;
+      if (r && r.message) RS.toast(r.message, r.ok === false);
+      if (after) await after(r);
+      return r;
+    } catch (e) { RS.toast(e.message, true); return null; }
+  };
+  RS.store = function (key, value) {
+    try { if (value === undefined) return localStorage.getItem(key); localStorage.setItem(key, value); } catch (_) { /* no storage here */ }
+    return null;
+  };
+  RS.options = function (select, items, value) {
+    select.innerHTML = items.map((it) => {
+      const [v, label] = Array.isArray(it) ? it : [it, it];
+      return `<option value="${RS.esc(v)}"${String(v) === String(value) ? " selected" : ""}>${RS.esc(label)}</option>`;
+    }).join("");
+  };
+  // A button that asks for a second click before doing something that can't be undone.
+  RS.armed = function (button, fn) {
+    button.addEventListener("click", () => {
+      if (button.classList.contains("armed")) { button.classList.remove("armed"); button.textContent = button.dataset.label; fn(); return; }
+      button.dataset.label = button.textContent; button.classList.add("armed"); button.textContent = "Click again";
+      setTimeout(() => { if (button.classList.contains("armed")) { button.classList.remove("armed"); button.textContent = button.dataset.label; } }, 3000);
+    });
+  };
+  RS.zoom = function (src) {
+    const z = document.createElement("div"); z.className = "zoom"; z.innerHTML = `<img src="${src}" alt="">`;
+    z.addEventListener("click", () => z.remove()); document.body.appendChild(z);
+  };
+  RS.label = (c) => String(c || "").replace("_", " & ");
+  RS.size = (bytes) => bytes >= 1048576 ? (bytes / 1048576).toFixed(bytes >= 10485760 ? 0 : 1) + " MB" : Math.max(1, Math.round(bytes / 1024)) + " KB";
+  RS.upload = async function (file) {
+    return RS.api("upload?name=" + RS.enc(file.name), file, true);
+  };
+
+  // ---------------------------------------------------------------- theme: follow WanGP
+  RS.theme = function () {
+    let dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    try {
+      const doc = window.parent && window.parent !== window ? window.parent.document : null;
+      if (doc) dark = doc.body.classList.contains("dark") || doc.documentElement.classList.contains("dark") ||
+        !!doc.querySelector("gradio-app.dark, .gradio-container.dark");
+    } catch (_) { /* opened on its own */ }
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  };
+
+  // ---------------------------------------------------------------- subtabs
+  RS.current = null;
+  RS.show = function (name, arg) {
+    if (!RS.views[name]) name = "library";
+    RS.current = name;
+    document.querySelectorAll(".view").forEach((v) => { v.hidden = v.id !== "view-" + name; });
+    document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.view === name));
+    RS.store("refmods.view", name);
+    const view = RS.views[name];
+    if (view && view.show) view.show(arg);
+  };
+
+  // ---------------------------------------------------------------- the model
+  RS.model = () => $("model").value;
+  async function loadSession() {
+    RS.session = await RS.api("session");
+    const m = RS.session.models || {};
+    const saved = RS.store("refmods.model");
+    const h3 = (m.h3 || []).map(([label, type]) => [type, label]);
+    RS.options($("model"), h3.length ? h3 : [["", "No MiniMax H3 Ref2VA model found"]],
+      h3.some(([t]) => t === saved) ? saved : m.h3_default);
+  }
+
+  // ---------------------------------------------------------------- jobs
+  const JOB_NAMES = { decompile: "Decompile", strength: "Strength preview", store_frames: "Encoder frames",
+                      soundtrack: "Soundtrack", clean_audio: "Clean audio", convert: "Convert to Flux", create: "Create" };
+  RS.running = (op, id) => Object.values(RS.watch).some((j) => j.op === op && (!id || (j.ids || []).includes(id)) &&
+                                                           (j.state === "running" || j.state === "waiting"));
+  RS.job = async function (op, payload, label) {
+    const model = payload.model !== undefined ? payload.model : RS.model();
+    if (!model) { RS.toast("Pick a MiniMax H3 model at the top first.", true); return null; }
+    const r = await RS.act(RS.api("jobs", Object.assign({ op, model }, payload)));
+    if (!r) return null;
+    RS.watch[r.id] = { id: r.id, op, ids: payload.ids || [], label: label || "", state: "waiting", message: "Waiting for WanGP…" };
+    renderJobs(); poll();
+    Object.values(RS.views).forEach((v) => v.jobs && v.jobs());
+    return r.id;
+  };
+  let polling = false;
+  async function poll() {
+    if (polling) return; polling = true;
+    try {
+      while (Object.values(RS.watch).some((j) => j.state === "waiting" || j.state === "running")) {
+        await new Promise((r) => setTimeout(r, 1200));
+        for (const j of Object.values(RS.watch)) {
+          if (j.state !== "waiting" && j.state !== "running") continue;
+          let s;
+          try { s = await RS.api("jobs/" + j.id); } catch (_) { continue; }
+          const was = j.state;
+          Object.assign(j, { state: s.state === "missing" ? "error" : s.state, message: s.message || j.message, made: s.made, lines: s.lines });
+          if (was !== j.state && (j.state === "done" || j.state === "error")) {
+            setTimeout(() => { delete RS.watch[j.id]; renderJobs(); }, j.state === "done" ? 8000 : 20000);
+            for (const fn of RS.jobDone) { try { await fn(j); } catch (e) { console.error(e); } }
+          }
+        }
+        renderJobs();
+      }
+    } finally { polling = false; }
+  }
+  function renderJobs() {
+    $("jobs").innerHTML = Object.values(RS.watch).map((j) => {
+      const who = j.label || (j.ids || []).map((i) => i.split(":").pop().split("/").pop()).join(", ");
+      return `<div class="job ${j.state}"><b>${RS.esc(JOB_NAMES[j.op] || j.op)}${who ? ": " + RS.esc(who) : ""}</b>${RS.esc(j.message || "")}</div>`;
+    }).join("");
+  }
+
+  // ---------------------------------------------------------------- start
+  async function start() {
+    RS.theme();
+    document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => RS.show(b.dataset.view)));
+    $("model").addEventListener("change", (e) => { RS.store("refmods.model", e.target.value); Object.values(RS.views).forEach((v) => v.model && v.model()); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { const z = document.querySelector(".zoom"); if (z) z.remove(); } });
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) { RS.theme(); const v = RS.views[RS.current]; if (v && v.refresh) v.refresh(); }
+    });
+    try { new MutationObserver(RS.theme).observe(window.parent.document.body, { attributes: true, attributeFilter: ["class"] }); } catch (_) { /* on its own */ }
+    try { await loadSession(); } catch (e) { RS.toast("Could not reach the plugin: " + e.message, true); }
+    for (const v of Object.values(RS.views)) { try { if (v.init) await v.init(); } catch (e) { console.error(e); } }
+    const hash = location.hash.replace("#", "");
+    RS.show(RS.views[hash] ? hash : (RS.store("refmods.view") || "library"));
+    try {
+      const active = (await RS.api("jobs")).jobs || [];
+      active.forEach((j) => { RS.watch[j.id] = j; });
+      if (active.length) { renderJobs(); poll(); }
+    } catch (_) { /* none */ }
+  }
+  window.addEventListener("DOMContentLoaded", start);
+})();

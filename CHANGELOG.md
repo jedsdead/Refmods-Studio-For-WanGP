@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.6.0] — 2026-11-26
+
+- **The Refmods tab is one web app** with four pages, Library, Create, Packs and Setup, and one MiniMax H3 model
+  picker at the top for every job. The Gradio Extract (H3), Extract (Flux), Decompile, Generate and Auto-arm tabs
+  are gone, along with the model picker above them. The panel under the prompt box is unchanged.
+- **Create** replaces both Extract tabs, for MiniMax H3 and Flux:
+  - drop, choose or paste pictures, videos and an audio file, then drag them into order;
+  - crop pictures (free, 1:1, 3:4, 4:3, 9:16, 16:9) and trim videos;
+  - one mod from all of them, or one per picture or video;
+  - **Full** or **Compressed**, with every old option under **Advanced**;
+  - a live estimate of the tokens and file size, with warnings. **Create** stays locked until the mod can be made.
+- **Packs** page: edit a pack's mods, roles, strength (0 to 2), how each is sent and its sound, and drag them into
+  order. Each mod has an **On** switch: off keeps it in the pack but leaves it out when the pack is added, and the
+  Prompt Builder ignores it. Packs also get a subject name for the Prompt Builder and a description.
+- **Library** additions:
+  - **Add to pack** for one mod or a selection;
+  - pack chips that open the pack;
+  - **Edit pictures** (drop or reorder a picture mod's pictures) and **Trim** for voices and soundtracks, plus
+    **Remove soundtrack**. These cut the stored latents, so nothing is re-encoded.
+- **Setup** page: the hook check for the chosen model, what Showrunner, Deepy and API tasks get (with a switch to
+  turn it off), and where everything is kept.
+- Re-saving a pack from the panel keeps the mods switched off in the editor.
+
 ## [0.5.0] — 2026-11-26
 
 - **The Library is a web app**, in the Library subtab of the Refmods tab. It replaces the Library and Decompile

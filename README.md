@@ -9,7 +9,7 @@ Refmods and the MiniMax H3 Prompt Builder in one WanGP plugin.
   prompt box and on its own tab, with an optional panel that writes the prompt with WanGP's prompt enhancer and
   Deepy tools for H3 prompts.
 
-The Refmods half is Refmods For Wan GP `0.38.1-fork.58` as it was; its guide is in [`docs/refmods.md`](docs/refmods.md).
+The Refmods half started as Refmods For Wan GP `0.38.1-fork.58`; its guide, for how mods work, is in [`docs/refmods.md`](docs/refmods.md).
 The Prompt Builder was reworked in 0.2 (below). The 4.x builder's guide is kept in
 [`docs/prompt-builder.md`](docs/prompt-builder.md) for the parts that still apply: the enhancer and the Deepy tools.
 
@@ -40,17 +40,28 @@ into the rows, or **Replace all** to start from it. Type a name and **Save as pa
 Builder, **Draft subjects** turns a character pack into one subject, each mod providing what its role says. Your old
 presets are listed as packs.
 
-## The Library
+## The Refmods tab
 
-The **Library** subtab of the Refmods tab holds every H3 and Flux mod. Pick a folder or pack on the left, search
-and filter at the top, and click a mod to see what's stored in it, rename or move it, edit its description and
-concept, or save a copy. Ctrl-click or tick several to move, delete or update them together, or drag them onto a
-folder.
+The Refmods tab is one app with four pages. The **MiniMax H3 model** at the top is the one every job runs on:
+creating, decoding, strength previews, encoder frames and soundtracks.
 
-What needs the model runs as a short task on the model picked at the top: **Decompile** (the pictures, video and
-sound as files), **Strength preview** (the first picture at a few strengths), **Decode to listen** for a voice,
-encoder frames, soundtracks, **Clean audio** and **Convert to Flux**. **Replace preview** sets the picture shown
-for a mod, from a file or from a decompiled or strength-preview picture. The mod itself doesn't change.
+- **Library** holds every H3 and Flux mod. Pick a folder or pack on the left, search and filter at the top, and click
+  a mod to see what's stored in it.
+  - Rename or move it, edit its description and concept, or save a copy.
+  - **Edit pictures** drops or reorders a picture mod's pictures. **Trim** a voice or soundtrack, or remove one.
+    Neither re-encodes anything, so they're instant.
+  - What needs the model runs as a short task: **Decompile**, **Strength preview** (the first picture at a few
+    strengths), **Decode to listen**, encoder frames, soundtracks, **Clean audio** and **Convert to Flux**.
+  - **Replace preview** sets the picture shown for a mod. The mod itself doesn't change.
+  - Ctrl-click or tick several to move, add to a pack, update or delete them together, or drag them onto a folder.
+- **Create** makes mods for MiniMax H3 or Flux. Drop pictures, videos or an audio file, drag them into order, crop
+  pictures and trim videos. Make one mod from all of them or one per picture or video, at **Full** (exact, best
+  for faces) or **Compressed** (smaller). The estimate shows the tokens and file size, and **Create** stays locked
+  until the mod can be made. Every option from the old Extract tabs is under **Advanced**.
+- **Packs** edits packs: their mods, each one's role, strength (up to 2), how it's sent, its sound, and an **On**
+  switch that keeps a mod in the pack but leaves it out when the pack is added.
+- **Setup** checks that Refmods is hooked into the chosen model, shows the mods Showrunner, Deepy and API tasks
+  get, and says where everything is kept.
 
 ## Installing
 
@@ -66,8 +77,8 @@ twice. It says so in the console and on its tab.
 
 Nothing needs moving:
 
-- Mods and presets stay in `loras/refmods_plugin/`, as with Refmods For Wan GP. Packs are in its `packs/` folder
-  and custom previews in `previews/`.
+- Mods and presets stay in `loras/refmods_plugin/`, as with Refmods For Wan GP. Packs are in its `packs/` folder,
+  custom previews in `previews/`, and files added on the Create page in `uploads/`.
 - Drafts, saved prompts and saved subjects stay in `loras/h3_prompt_builder/`, as with the Prompt Builder 4.4.0.
   If you're coming from 4.3 or earlier, they're copied in from the old plugin folder the first time Refmods Studio
   starts.

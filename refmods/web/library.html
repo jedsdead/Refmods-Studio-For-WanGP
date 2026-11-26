@@ -3,65 +3,188 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Refmods Library</title>
+<title>Refmods</title>
 <link rel="stylesheet" href="static/library.css?v=__V__">
 </head>
 <body>
 <div id="app">
 
-<header class="toolbar">
-  <input id="search" type="search" placeholder="Search names, descriptions, tags" aria-label="Search">
-  <div class="seg" id="kinds" role="group" aria-label="Kind">
-    <button data-kind="" class="on">All</button><button data-kind="image">Pictures</button><button data-kind="video">Video</button><button data-kind="audio">Audio</button>
+<nav class="apphead">
+  <div class="tabs" id="tabs" role="tablist">
+    <button role="tab" data-view="library">Library</button>
+    <button role="tab" data-view="create">Create</button>
+    <button role="tab" data-view="packs">Packs</button>
+    <button role="tab" data-view="setup">Setup</button>
   </div>
-  <select id="concept" aria-label="Concept"><option value="">Any concept</option></select>
-  <select id="sort" aria-label="Sort">
-    <option value="name">Name</option><option value="new">Newest</option><option value="size">Largest</option><option value="tokens">Most tokens</option>
-  </select>
   <span class="grow"></span>
-  <label class="inline" title="Decoding, strength previews, encoder frames and soundtracks run as a short task on this model">Model
-    <select id="model" aria-label="MiniMax H3 model for jobs"></select></label>
-  <div class="menu">
-    <button id="menuBtn" aria-haspopup="true" aria-expanded="false" title="More">⋯</button>
-    <div class="menu-list" id="menuList" hidden>
-      <button data-act="frames-all">Store encoder frames for every mod missing them</button>
-      <button data-act="reclassify">Re-check picture and video kinds</button>
-      <button data-act="refresh">Refresh</button>
+  <label class="inline" title="Creating, decoding, strength previews, encoder frames and soundtracks run as a short task on this model">MiniMax H3 model
+    <select id="model" aria-label="MiniMax H3 model"></select></label>
+</nav>
+
+<!-- ============================================================ Library -->
+<section class="view" id="view-library" hidden>
+  <header class="toolbar">
+    <input id="search" type="search" placeholder="Search names, descriptions, packs" aria-label="Search">
+    <div class="seg" id="kinds" role="group" aria-label="Kind">
+      <button data-kind="" class="on">All</button><button data-kind="image">Pictures</button><button data-kind="video">Video</button><button data-kind="audio">Audio</button>
     </div>
+    <select id="concept" aria-label="Concept"><option value="">Any concept</option></select>
+    <select id="sort" aria-label="Sort">
+      <option value="name">Name</option><option value="new">Newest</option><option value="size">Largest</option><option value="tokens">Most tokens</option>
+    </select>
+    <span class="grow"></span>
+    <div class="menu">
+      <button id="menuBtn" aria-haspopup="true" aria-expanded="false" title="More">⋯</button>
+      <div class="menu-list" id="menuList" hidden>
+        <button data-act="frames-all">Store encoder frames for every mod missing them</button>
+        <button data-act="reclassify">Re-check picture and video kinds</button>
+        <button data-act="refresh">Refresh</button>
+      </div>
+    </div>
+  </header>
+  <div class="bulk" id="bulk" hidden>
+    <span id="bulkCount"></span>
+    <select id="bulkDest" aria-label="Move to"></select><button id="bulkMove">Move</button>
+    <span class="sep"></span>
+    <button id="bulkPack" title="Add them to a pack, or make a new one">Add to pack</button>
+    <button id="bulkFrames" title="Decode and store the pictures the text encoder is shown">Store encoder frames</button>
+    <button id="bulkClean" title="Keep voices only; saved as copies">Clean audio</button>
+    <button id="bulkHint" title="Copy a prompt line built from the descriptions">Copy prompt hint</button>
+    <button id="bulkDelete" class="danger">Delete</button>
+    <span class="grow"></span>
+    <button id="bulkClear" class="small">Clear selection</button>
   </div>
-</header>
+  <div class="cols">
+    <nav class="side" id="side" aria-label="Folders"></nav>
+    <section class="pane gridwrap">
+      <div class="grid-head"><span id="count" class="muted"></span><span class="grow"></span>
+        <span class="muted small">Click to open · Ctrl-click or tick to select several · drag onto a folder to move</span></div>
+      <div class="grid" id="grid"></div>
+    </section>
+    <aside class="pane details" id="details"><div class="empty-detail">Pick a mod to see what's inside it.</div></aside>
+  </div>
+</section>
 
-<div class="bulk" id="bulk" hidden>
-  <span id="bulkCount"></span>
-  <select id="bulkDest" aria-label="Move to"></select><button id="bulkMove">Move</button>
-  <span class="sep"></span>
-  <button id="bulkFrames" title="Decode and store the pictures the text encoder is shown">Store encoder frames</button>
-  <button id="bulkClean" title="Keep voices only; saved as copies">Clean audio</button>
-  <button id="bulkHint" title="Copy a prompt line built from the descriptions">Copy prompt hint</button>
-  <button id="bulkDelete" class="danger">Delete</button>
-  <span class="grow"></span>
-  <button id="bulkClear" class="small">Clear selection</button>
-</div>
+<!-- ============================================================ Create -->
+<section class="view" id="view-create" hidden>
+  <div class="create">
+    <div class="pane cmain">
+      <div class="row">
+        <div class="seg" id="cFamily" role="group" aria-label="Model">
+          <button data-family="h3" class="on">MiniMax H3</button><button data-family="flux">Flux 2 / 3</button>
+        </div>
+        <label class="inline flux-only">Flux model <select id="cFluxModel"></select></label>
+        <span class="grow"></span>
+        <button id="cReset" class="small" title="Clear the sources and put every option back">Start over</button>
+      </div>
 
-<main class="cols">
-  <nav class="side" id="side" aria-label="Folders"></nav>
+      <div class="drop" id="cDrop" tabindex="0">
+        <b>Drop pictures, videos<span class="h3-only"> or an audio file</span> here</b>
+        <span class="muted small">or <button id="cPick" class="small">choose files</button> · drag the cards to change their order</span>
+        <input type="file" id="cFiles" multiple accept="image/*,video/*,audio/*" hidden>
+      </div>
+      <div class="sources" id="cSources"></div>
 
-  <section class="gridwrap">
-    <div class="grid-head"><span id="count" class="muted"></span><span class="grow"></span>
-      <span class="muted small">Click to open · Ctrl-click or tick to select several · drag onto a folder to move</span></div>
-    <div class="grid" id="grid"></div>
-  </section>
+      <div class="grid2">
+        <label class="fld">Name (a path makes a subfolder: characters/tanya)<input id="cName" value="my_mod"></label>
+        <label class="fld">Concept<select id="cConcept"></select></label>
+      </div>
+      <label class="fld">Description (for prompt hints and search)<input id="cDesc"></label>
 
-  <aside class="details" id="details">
-    <div class="empty-detail">Pick a mod to see what's inside it.</div>
-  </aside>
-</main>
+      <div class="opts">
+        <div class="opt">
+          <span class="cap">Make</span>
+          <div class="seg" id="cSplit"><button data-split="all" class="on">One mod from all of them</button><button data-split="each">One mod per picture or video</button></div>
+        </div>
+        <div class="opt h3-only">
+          <span class="cap">Quality</span>
+          <div class="seg" id="cMode"><button data-mode="encode">Full</button><button data-mode="training" class="on">Compressed</button></div>
+          <span class="muted small" id="cModeNote"></span>
+        </div>
+        <div class="opt flux-only">
+          <span class="cap">Size per picture</span><select id="cBudget"></select>
+          <span class="cap">Layout</span><select id="cLayout"></select>
+        </div>
+        <div class="opt video-opt">
+          <label class="inline h3-only"><input type="checkbox" id="cAsPictures"> Turn videos into pictures</label>
+          <label class="inline pps">Pictures per second <input type="number" id="cPps" class="num" min="0.25" max="12" step="0.25" value="1"></label>
+        </div>
+        <div class="opt h3-only audio-opt">
+          <label class="inline">Audio length <input type="number" id="cAudioSecs" class="num" min="2" max="15" step="0.5" value="4"> s</label>
+          <label class="inline clip-audio"><input type="checkbox" id="cClipAudio"> Use the clip's own sound</label>
+          <label class="inline"><input type="checkbox" id="cCleanAudio"> Remove music and noise</label>
+        </div>
+      </div>
+
+      <details class="sec h3-only" id="cAdvanced"><summary>Advanced</summary><div class="secbody">
+        <div class="grid3">
+          <label class="fld">Reference size (short edge, px)<input type="number" id="cRefRes" min="256" max="2048" step="64" value="1024"></label>
+          <label class="fld">Prompt-view size (long edge, px)<input type="number" id="cEncRes" min="256" max="2048" step="64" value="1024"></label>
+          <label class="fld">Max tokens (0 = no cap)<input type="number" id="cMaxTok" min="0" max="65536" step="512" value="65536"></label>
+          <label class="fld compressed">Pool grid height<input type="number" id="cPoolH" min="2" max="64" step="2" value="16"></label>
+          <label class="fld compressed">Pool grid width<input type="number" id="cPoolW" min="2" max="64" step="2" value="16"></label>
+          <label class="fld compressed">Identity refinement steps<input type="number" id="cIdent" min="0" max="2000" step="50" value="500"></label>
+          <label class="fld">Repeat multiplier<input type="number" id="cMult" min="1" max="10" step="1" value="1"></label>
+        </div>
+        <label class="inline compressed"><input type="checkbox" id="cMerge"> Merge the pictures into one (keeps what they share; best on similar shots)</label>
+        <label class="inline"><input type="checkbox" id="cRembg"> Remove the background behind people and objects in pictures</label>
+        <label class="inline"><input type="checkbox" id="cTest"> Test run: make it but don't save it</label>
+        <p class="explain">Reference size caps the picture the mod is made from; it never enlarges. Prompt-view size is what the text encoder sees to bind the label. Pool grid and refinement only apply to Compressed.</p>
+      </div></details>
+    </div>
+
+    <aside class="pane cside">
+      <div class="cap">Estimate</div>
+      <div id="cEstimate" class="estimate"></div>
+      <button id="cGo" class="primary big" disabled>Create</button>
+      <div id="cBlockers" class="explain"></div>
+      <div id="cResult"></div>
+    </aside>
+  </div>
+</section>
+
+<!-- ============================================================ Packs -->
+<section class="view" id="view-packs" hidden>
+  <div class="packs">
+    <nav class="pane plist">
+      <div class="row"><input id="pSearch" type="search" placeholder="Find a pack" class="grow"><button id="pNew" class="small primary">New</button></div>
+      <div id="pList"></div>
+    </nav>
+    <section class="pane peditor" id="pEditor"><div class="empty-detail">Pick a pack, or make a new one.</div></section>
+    <aside class="pane ppicker" id="pPicker" hidden>
+      <div class="cap">Add mods</div>
+      <input id="pModSearch" type="search" placeholder="Search mods">
+      <div id="pMods" class="pmods"></div>
+    </aside>
+  </div>
+</section>
+
+<!-- ============================================================ Setup -->
+<section class="view" id="view-setup" hidden>
+  <div class="setup pane" id="setup"></div>
+</section>
 
 <div class="jobs" id="jobs" aria-live="polite"></div>
 <div class="toast" id="toast" role="status"></div>
+<dialog id="cropDlg"><div class="dlg">
+  <div class="row"><b>Crop</b><span class="grow"></span>
+    <div class="seg" id="cropAspect"><button data-r="0" class="on">Free</button><button data-r="1">1:1</button><button data-r="0.75">3:4</button><button data-r="1.3333">4:3</button><button data-r="0.5625">9:16</button><button data-r="1.7778">16:9</button></div></div>
+  <div class="cropstage" id="cropStage"><img id="cropImg" alt=""><div class="cropbox" id="cropBox"><span class="h nw"></span><span class="h ne"></span><span class="h sw"></span><span class="h se"></span></div></div>
+  <div class="row"><span class="muted small" id="cropInfo"></span><span class="grow"></span><button id="cropCancel">Cancel</button><button id="cropReset">Whole picture</button><button id="cropOk" class="primary">Crop</button></div>
+</div></dialog>
+<dialog id="packDlg"><div class="dlg">
+  <b>Add to a pack</b>
+  <label class="fld">Pack<select id="packDlgSel"></select></label>
+  <label class="fld" id="packDlgNewWrap">New pack's name<input id="packDlgNew"></label>
+  <div class="row"><span class="grow"></span><button id="packDlgCancel">Cancel</button><button id="packDlgOk" class="primary">Add</button></div>
+</div></dialog>
 <input type="file" id="pickPreview" accept="image/*" hidden>
 <input type="file" id="pickAudio" accept="audio/*,video/*" hidden>
 </div>
+<script src="static/common.js?v=__V__"></script>
 <script src="static/library.js?v=__V__"></script>
+<script src="static/create.js?v=__V__"></script>
+<script src="static/packs.js?v=__V__"></script>
+<script src="static/setup.js?v=__V__"></script>
 </body>
 </html>

@@ -85,7 +85,7 @@ def build_inline(plugin):
     get_base_mt = getattr(plugin, "get_base_model_type", None)
     with gr.Accordion("Refmods: Flux", open=False) as accordion:
         gr.Markdown("Works with **Flux 2** (Dev, Klein 4B / 9B) and **Flux 3 Klein**. "
-                    "Make mods in the **Refmods** tab (Extract (Flux)).")
+                    "Make mods on the **Refmods** tab (Create, Flux).")
         with gr.Row():
             refresh_btn = gr.Button("🔄 Refresh mod list", size="sm", scale=0)
             clear_btn = gr.Button("Clear", size="sm", scale=0)
@@ -191,48 +191,3 @@ def build_inline(plugin):
 LAYOUT_UI = [("Separate references", flux.LAYOUT_SEPARATE), ("Contact sheet (one reference)", flux.LAYOUT_SHEET),
              ("Merge into one picture", flux.LAYOUT_MERGE)]
 LAYOUT_INFO = "Several pictures: one reference each, side by side in one, or averaged into one (smaller, softer)."
-
-
-def build_tab(plugin, api_session):
-    """The Extract (Flux) tab."""
-    choices = _model_choices(api_session)
-    gr.Markdown("### Extract a Flux RefMod\nFor **Flux 2** (Dev, Klein 4B / 9B) and **Flux 3 Klein**: one mod "
-                "works in all of them. Saved mods are listed in the **Library** tab.")
-    model_dd = gr.Dropdown(label="Flux model (its VAE does the encoding)", choices=choices,
-                           value=choices[0][1] if choices else None)
-    with gr.Row():
-        name = gr.Textbox(label="Mod name", value="my_flux_mod", info="A path (people/anna) makes a subfolder.")
-        budget = gr.Dropdown(label="Size per picture", choices=BUDGET_UI, value=flux.DEFAULT_BUDGET,
-                             info="Fewer tokens = faster, less detail.")
-        concept = gr.Dropdown(label="Concept type", choices=list(flux.CONCEPT_TYPES), value="identity")
-    with gr.Row():
-        images = gr.Files(label="Pictures", file_types=["image"], file_count="multiple")
-        with gr.Column():
-            videos = gr.Files(label="Videos (become pictures)", file_types=["video"], file_count="multiple")
-            per_second = gr.Slider(0.25, 4, value=1.0, step=0.25, label="Pictures per second of video",
-                                   info=f"Sharpest frame of each slot; up to {flux.MAX_VIDEO_PICTURES} per video.")
-    from . import order_ui
-    order = order_ui.build(images, videos, note="Separate references are numbered in this order.")
-    layout = gr.Radio(label="Layout", choices=LAYOUT_UI, value=flux.LAYOUT_SEPARATE, info=LAYOUT_INFO)
-    description = gr.Textbox(label="Description", lines=1, info="A note for you; the model never reads it.")
-    extract_btn = gr.Button("Extract Flux RefMod", variant="primary")
-    extract_status = gr.Markdown("")
-
-    def do_extract(model_type, mod_name, size, concept_type, files, video_files, rate, how, note, sequence=None):
-        paths = [getattr(f, "name", f) for f in (files or [])]
-        video_paths = [getattr(f, "name", f) for f in (video_files or [])]
-        if not model_type:
-            return "⚠️ Pick a Flux model first (none installed?)."
-        if not paths and not video_paths:
-            return "⚠️ Add at least one picture or video."
-        ok, message = submit_extract(plugin, api_session, model_type,
-                                     {"name": mod_name, "images": paths, "videos": video_paths,
-                                      "pictures_per_second": float(rate or 1.0), "layout": how,
-                                      "order": order_ui.merged_order(sequence, files, video_files),
-                                      "budget": int(size or flux.DEFAULT_BUDGET),
-                                      "concept_type": concept_type, "description": note or ""})
-        return ("✅ " if ok else "❌ ") + message
-
-    extract_btn.click(fn=do_extract,
-                      inputs=[model_dd, name, budget, concept, images, videos, per_second, layout, description, order],
-                      outputs=[extract_status])
