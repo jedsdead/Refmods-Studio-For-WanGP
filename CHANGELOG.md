@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.8.1] — 2026-11-26
+
+Prompt Builder:
+- **The camera composer is back**, with the 4.x builder's rules. Its fields are framing, rig, lens, "of" (what's in
+  frame, where `!Name` works), the cut or move verb, the camera move, amplitude and speed, and all of them can be
+  typed in.
+  - Framing and rig make one shot ("a medium crane shot"), and the lens goes before what's in frame: "The camera cuts
+    to a medium close-up shot on an 85mm portrait lens of <Subject 1>. The camera pushes in at slow speed."
+  - On **Auto** the opening shot takes no verb, a new shot cuts, and a second camera sentence in the same shot moves.
+  - The camera moves are the guide's table plus the 4.x builder's extras.
+- **Shot on** in the Style box adds the camera or film and the lens: "Shot on an Arri Alexa digital cinema camera
+  using an anamorphic lens."
+- **The character creator writes proper sentences again.**
+  - Adjectives go in English order before the noun: height, then age, then ethnicity ("a tall 34-year-old East Asian
+    woman").
+  - What can't go there follows it: "in her early 30s", "of average height", ", six feet tall,".
+  - Then one "with" list ("with an athletic build, long wavy red hair and green eyes"), then the clothing. Clothing
+    that already has its own verb ("dressed in…") is kept as written.
+  - "a" or "an" goes by sound (an 8-year-old, an 85mm, a European).
+- A sentence from a button starts in lowercase after a comma, so "[Shot 2] At 00:04.000, the camera cuts to…" reads
+  right.
+
 ## [0.8.0] — 2026-11-26
 
 Prompt Builder:

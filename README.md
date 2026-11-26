@@ -25,7 +25,8 @@ any mods in the Refmods panel. The **Prompt Builder** subtab reads them:
 - **Subjects**: name and describe each one with the character creator, then say where its look comes from (a
   picture, a mod, or the description only) and its voice (an audio reference, a voice mod, or gender and tone). In
   Reference mode they write `subject_definitions` and `retention_analysis` in the bundled H3 guide's wording.
-- **Insert**: Shot, Camera, Subject and Dialogue write the guide's notation at the cursor. Only **Time** writes a
+- **Insert**: Shot, Camera, Subject and Dialogue write the guide's notation at the cursor. The camera row composes the
+  shot (framing, rig, lens, what's in frame) and the move; on Auto it cuts at a new shot and moves within one. Only **Time** writes a
   timestamp, so a line or a shot has one only where you put it.
 - **Tags**: right-click one to swap it with another or remove it, here, in this box or everywhere (a subject goes
   with its tag). Type `!Name` for a subject; Tab completes it.

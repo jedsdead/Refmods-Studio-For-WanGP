@@ -31,15 +31,44 @@ DEFAULT_PARTS = ["face", "hair", "skin", "body type"]
 LANGUAGES = ("English", "French", "German", "Spanish", "Italian", "Portuguese", "Japanese", "Chinese",
              "Korean", "Russian", "Irish", "Arabic", "Hindi")
 
+# The guide's camera table (the expressions the model was trained on), then a few moves it lacks.
 CAMERA_MOVES = {
-    "Push In": "pushes in", "Pull Out": "pulls out", "Zoom In": "zooms in", "Zoom Out": "zooms out",
-    "Pan Left": "pans left", "Pan Right": "pans right", "Truck Left": "trucks left",
-    "Truck Right": "trucks right", "Tilt Up": "tilts up", "Tilt Down": "tilts down",
-    "Pedestal Up": "pedestals up", "Pedestal Down": "pedestals down", "Arc Shot": "arcs around",
-    "Tracking Shot": "tracks", "Static Shot": "holds a static shot", "Shake Slightly": "shakes slightly",
-    "Shake Strongly": "shakes strongly", "POV": "moves as a point-of-view shot",
-    "Roll Clockwise": "rolls clockwise", "Roll Counterclockwise": "rolls counterclockwise",
+    "Zoom In": "zooms in", "Zoom Out": "zooms out", "Push In": "pushes in", "Pull Out": "pulls out",
+    "Pan Left": "pans left", "Pan Right": "pans right", "Truck Left": "trucks left", "Truck Right": "trucks right",
+    "Tilt Up": "tilts up", "Tilt Down": "tilts down", "Pedestal Up": "rises on the pedestal",
+    "Pedestal Down": "lowers on the pedestal", "Arc Shot": "moves in an arc around the subject",
+    "Tracking Shot": "tracks the subject", "Static Shot": "holds a static shot", "Shake Slightly": "shakes slightly",
+    "Shake Strongly": "shakes strongly", "POV": "takes the subject's point of view", "Roll Clockwise": "rolls clockwise",
+    "Roll Counterclockwise": "rolls counterclockwise",
+    "Full 360 Orbit": "makes a full 360-degree orbit around the subject", "Spiral Around Subject": "spirals around the subject",
+    "Dolly Zoom": "performs a dolly zoom", "Crash Zoom In": "crash zooms in", "Snap Zoom Out": "snap zooms out",
+    "Whip Pan": "whip pans", "Rack Focus": "racks focus", "Trail Behind Subject": "trails behind the subject",
+    "Lead Subject Backwards": "leads the subject backwards", "Locked Off": "holds a locked-off frame",
 }
+# Framing and rig are adjectives: "shot" is added once after them, so "medium" and "crane" make
+# "a medium crane shot" (a rig after "on a" would put the crane in the frame).
+FRAMINGS = ("", "extreme close-up", "close-up", "medium close-up", "medium", "medium-wide", "wide", "extreme wide",
+            "establishing", "over-the-shoulder", "low-angle", "high-angle", "overhead", "worm's-eye", "dutch-angle",
+            "point-of-view", "profile", "silhouette", "insert", "cutaway", "master", "reflection",
+            "through-the-window")
+RIGS = ("", "tripod", "handheld", "shoulder-rig", "steadicam", "gimbal", "dolly", "crane", "jib", "drone",
+        "cable-cam", "car-mounted", "hood-mounted", "slider", "motion-control", "underwater", "body-mounted",
+        "vehicle-mounted")
+LENSES = ("", "a 14mm ultra-wide lens", "a 24mm wide-angle lens", "a 35mm lens", "a 50mm standard lens",
+          "an 85mm portrait lens", "a 100mm macro lens", "a 135mm telephoto lens", "a 200mm telephoto lens",
+          "an anamorphic lens", "a fisheye lens", "a tilt-shift lens", "a vintage soft-focus lens",
+          "a large-format lens with shallow depth of field", "a probe lens", "a split-diopter lens")
+CUT_VERBS = ("the camera cuts to", "the shot cuts to", "the shot hard-cuts to", "the shot smash-cuts to",
+             "the shot match-cuts to", "the shot jump-cuts to", "the shot transitions to", "the shot cross-dissolves to",
+             "the shot dissolves to", "the shot fades to", "the shot wipes to", "the shot whip-pans to",
+             "the shot cuts away to")
+# For a camera change inside a shot, rather than at a cut.
+CONTINUE_VERBS = ("the camera moves to", "the camera continues into", "the camera reframes to",
+                  "the camera settles into", "the camera drifts to", "the camera swings round to")
+CAMERA_BODIES = ("an IMAX camera", "IMAX 70mm film", "an Arri Alexa digital cinema camera", "a RED digital cinema camera",
+                 "a Panavision camera", "Super 35mm film", "Super 16mm film", "16mm film", "8mm film", "35mm film",
+                 "an 8K digital camera", "a DSLR", "a GoPro action camera", "a drone camera", "a vintage VHS camcorder",
+                 "a phone camera", "a security camera", "black-and-white film stock")
 AMPLITUDES = ("", "with small amplitude", "with large amplitude")
 SPEEDS = ("", "at slow speed", "at fast speed")
 
@@ -356,7 +385,7 @@ def media_summary(media: list[Media]) -> str:
 
 def pronoun(subject: dict) -> str:
     gender = _s(subject.get("gender")).lower()
-    return {"woman": "her", "girl": "her", "man": "his", "boy": "his"}.get(gender, "their")
+    return {"woman": "her", "girl": "her", "female": "her", "man": "his", "boy": "his", "male": "his"}.get(gender, "their")
 
 
 def gender_noun(subject: dict) -> str:
@@ -367,41 +396,102 @@ def display_name(subject: dict, index: int) -> str:
     return _s(subject.get("name")) or f"Subject {index}"
 
 
+def article(phrase: str) -> str:
+    """'a' or 'an' by sound: an 85mm, an 18-year-old, a one-off, a European, an hour."""
+    p = _s(phrase).lower()
+    if not p:
+        return "a"
+    if p.startswith(("one", "uni", "use", "eu", "ewe", "u-", "ur")) and not p.startswith(("under", "umb", "up")):
+        return "a"
+    if p.startswith(("hour", "honest", "heir", "honour", "honor")):
+        return "an"
+    digits = re.match(r"(\d+)", p)
+    if digits:
+        n = digits.group(1)
+        return "an" if n.startswith("8") or n in ("11", "18") or (len(n) in (2, 5) and n.startswith(("11", "18"))) else "a"
+    return "an" if p[0] in "aeiou" else "a"
+
+
+def join_and(items) -> str:
+    items = [i for i in items if i]
+    return items[0] if len(items) == 1 else (", ".join(items[:-1]) + " and " + items[-1]) if items else ""
+
+
+GENDER_NOUNS = {"woman": "woman", "man": "man", "girl": "girl", "boy": "boy", "person": "person",
+                "female": "woman", "male": "man"}
+HEIGHT_WORDS = ("tall", "short", "petite", "statuesque", "towering", "small", "little", "lanky", "diminutive")
+DECADE_AGE = re.compile(r"(\d0s|teens|twenties|thirties|forties|fifties|sixties|seventies|eighties|nineties|old age|childhood)", re.I)
+
+
 def describe(subject: dict) -> str:
-    """The creator's fields as one sentence, without a trailing full stop."""
+    """The creator's fields as one sentence, without a trailing full stop. Every field is optional, and the
+    grammar follows whatever is filled in. Adjectives go in English order before the noun (height, then age,
+    then ethnicity: "a tall 34-year-old East Asian woman"); what can't go there follows it ("in her early 30s",
+    "six feet tall"), then "with" and one list (build, hair, eyes), then the clothing."""
     kind = subject.get("kind") or "Character"
     name = _s(subject.get("name"))
     details = _s(subject.get("details")).rstrip(".")
     if kind != "Character":
-        bits = [b for b in (name, details) if b]
-        return ", ".join(bits)
-    age = _s(subject.get("age"))
-    gender = _s(subject.get("gender")) or ("person" if any(_s(subject.get(k)) for k in
-                                                          ("height", "build", "ethnicity")) else "")
-    lead = []
-    if age and age.isdigit():
-        lead.append(f"{age}-year-old")
-    for key in ("height", "build", "ethnicity"):
-        if _s(subject.get(key)):
-            lead.append(_s(subject.get(key)))
-    noun = " ".join(lead + ([gender] if gender else []))
-    text = f"a {noun}" if noun else ""
-    if age and not age.isdigit():
-        text += (" " if text else "") + (f"in {pronoun(subject)} {age}" if age.endswith("s") else age)
-    hair = " ".join(_s(subject.get(k)) for k in ("hairstyle", "haircolor") if _s(subject.get(k)))
-    eyes = _s(subject.get("eyecolor"))
+        return ", ".join(b for b in (name, details) if b)
+    gender = _s(subject.get("gender")).lower()
+    noun = GENDER_NOUNS.get(gender, f"{gender} person" if gender else "")
+    age, height, ethnicity = _s(subject.get("age")), _s(subject.get("height")), _s(subject.get("ethnicity"))
+    build = _s(subject.get("build"))
+    before, after = [], []
+    # Height: a single word goes first; a measurement or "average height" follows the noun.
+    if height:
+        low = height.lower()
+        if " " not in low and any(low.startswith(w) or low == w for w in HEIGHT_WORDS):
+            before.append(height)
+        elif "height" in low:
+            after.append(height if low.startswith("of ") else f"of {height}")
+        elif any(w in low for w in HEIGHT_WORDS):
+            after.append(height)
+        else:
+            after.append(f"{height} tall")
+    # Age: 34 -> "34-year-old"; a decade -> "in her early 30s"; a word ("elderly") -> an adjective.
+    if age:
+        if age.isdigit():
+            before.append(f"{age}-year-old")
+        elif DECADE_AGE.search(age) or re.match(r"(early|mid|late)[ -]", age, re.I):
+            after.insert(0, f"in {pronoun(subject)} {age}")
+        else:
+            before.append(age)
+    if ethnicity:
+        before.append(ethnicity)
+    if not noun and (before or after):
+        noun = "person"
+    head = " ".join(before + ([noun] if noun else []))
+    head = f"{article(head)} {head}" if head else ""
+    # One "with" list: build, hair, eyes.
     withs = []
-    if hair:
-        withs.append(f"{hair} hair")
+    if build:
+        phrase = build if "build" in build.lower() else f"{build} build"
+        withs.append(f"{article(phrase)} {phrase}")
+    style, colour = _s(subject.get("hairstyle")), _s(subject.get("haircolor"))
+    if style.lower() in ("bald", "shaved head", "shaved"):
+        withs.append("a bald head" if style.lower() == "bald" else "a shaved head")
+    elif style or colour:
+        hair = " ".join(b for b in (style, colour) if b)
+        withs.append(hair if hair.lower().endswith("hair") else f"{hair} hair")
+    eyes = _s(subject.get("eyecolor"))
     if eyes:
-        withs.append(f"{eyes} eyes")
+        withs.append(eyes if eyes.lower().endswith("eyes") else f"{eyes} eyes")
+    # "in her 30s" and "of average height" join with a space; a measurement ("six feet tall") is set off by
+    # commas, and then the "with" list follows a comma too.
+    text, set_off = head, False
+    for bit in after:
+        joined = not (bit.startswith(("in ", "of ")))
+        text = (f"{text}, {bit}" if joined else f"{text} {bit}") if text else bit
+        set_off = joined
     if withs:
-        text += (" " if text else "") + "with " + " and ".join(withs)
+        text = (f"{text}{',' if set_off else ''} " if text else "") + "with " + join_and(withs)
     clothing = _s(subject.get("clothing")).rstrip(".")
     if clothing:
-        text += (", " if text else "") + f"wearing {clothing}"
-    lead_text = ", ".join(b for b in (name, text) if b)
-    return ". ".join(b for b in (lead_text, details) if b)
+        worn = clothing if clothing.lower().startswith(("wearing", "dressed", "clad", "in ")) else f"wearing {clothing}"
+        text += (", " if text else "") + worn
+    lead = ", ".join(b for b in (name, text) if b)
+    return ". ".join(b for b in (lead, details) if b)
 
 
 def subject_media(subject: dict, media: dict) -> tuple[list, str]:
@@ -854,11 +944,56 @@ def shot_snippet(action: str, at) -> str:
     return f"[Shot {shots[-1][0] + 1}] "   # only the Time button writes a time
 
 
-def camera_snippet(move: str, amplitude: str = "", speed: str = "") -> str:
-    verb = CAMERA_MOVES.get(move, "")
-    if not verb:
+def shot_phrase(framing: str, rig: str) -> str:
+    """Framing and rig as one noun phrase: "a medium crane shot"."""
+    words = [w for w in (_s(framing), _s(rig)) if w]
+    if not words:
         return ""
-    return " ".join(b for b in ("The camera", verb, amplitude, speed) if b) + " "
+    phrase = " ".join(words)
+    phrase = phrase if phrase.lower().endswith("shot") else phrase + " shot"
+    return f"{article(phrase)} {phrase}"
+
+
+CAMERA_SENTENCE = re.compile(r"\b(the camera|the shot)\b|\b\w+ shot (of|on)\b", re.I)
+
+
+def camera_snippet(move: str, amplitude: str = "", speed: str = "", action: str = "", framing: str = "",
+                   rig: str = "", lens: str = "", subject: str = "", verb: str = "") -> str:
+    """The camera sentence(s), as the old builder wrote them: "The camera cuts to a medium crane shot on a
+    35mm lens of <Subject 1>. The camera pushes in slowly." With the verb left on Auto, the opening shot takes
+    none (there's nothing to cut from), a new shot takes "the camera cuts to", and a second camera sentence in
+    the same shot takes "the camera moves to"."""
+    verb, lens, subject = _s(verb), _s(lens), _s(subject).rstrip(".").rstrip()
+    shots = shots_of(action)
+    if not verb and (framing or rig or subject):
+        current = shots[-1][1] if shots else (action or "")
+        body = re.sub(r"^\[Shot \d+\]\s*", "", current)
+        if CAMERA_SENTENCE.search(body):
+            verb = CONTINUE_VERBS[0]
+        elif len(shots) > 1:
+            verb = CUT_VERBS[0]
+    sentences = []
+    shot = shot_phrase(framing, rig)
+    if shot or subject:
+        if verb and shot:
+            head = f"{verb} {shot}"
+        elif shot:
+            head = shot
+        elif verb:
+            head, subject = f"{verb} {subject}", ""
+        else:
+            head, subject = f"the frame holds {subject}", ""
+        if lens:
+            head += f" on {lens}"
+        if subject:
+            head += f" of {subject}"
+        sentences.append(head[0].upper() + head[1:] + ".")
+    elif lens:
+        sentences.append(f"Shot on {lens}.")
+    moving = CAMERA_MOVES.get(move, "")
+    if moving:
+        sentences.append(" ".join(b for b in ("The camera", moving, _s(amplitude), _s(speed)) if b) + ".")
+    return (" ".join(sentences) + " ") if sentences else ""
 
 
 def subject_snippet(subjects: list, index: int, mode: str, action: str) -> str:

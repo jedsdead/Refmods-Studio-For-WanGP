@@ -257,7 +257,14 @@ class Service:
         if kind == "shot":
             return core.shot_snippet(form["action"], args.get("at"))
         if kind == "camera":
-            return core.camera_snippet(args.get("move", ""), args.get("amplitude", ""), args.get("speed", ""))
+            return core.camera_snippet(args.get("move", ""), args.get("amplitude", ""), args.get("speed", ""),
+                                       form["action"], args.get("framing", ""), args.get("rig", ""),
+                                       args.get("lens", ""), args.get("of", ""), args.get("verb", ""))
+        if kind == "gear":
+            body, lens = core._s(args.get("body")), core._s(args.get("lens"))
+            if body and lens:
+                return f"Shot on {body} using {lens}. "
+            return f"Shot on {body}. " if body else (f"Shot using {lens}. " if lens else "")
         if kind == "subject":
             return core.subject_snippet(form["subjects"], int(args.get("index") or 0), mode, form["action"])
         if kind == "line":

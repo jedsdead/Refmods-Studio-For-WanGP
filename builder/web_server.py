@@ -46,6 +46,9 @@ def create_app(plugin, host):
                          "parts": list(core.PARTS), "default_parts": list(core.DEFAULT_PARTS),
                          "languages": list(core.LANGUAGES), "camera": list(core.CAMERA_MOVES),
                          "amplitudes": list(core.AMPLITUDES), "speeds": list(core.SPEEDS),
+                         "framings": list(core.FRAMINGS), "rigs": list(core.RIGS), "lenses": list(core.LENSES),
+                         "cuts": list(core.CUT_VERBS), "continues": list(core.CONTINUE_VERBS),
+                         "bodies": list(core.CAMERA_BODIES),
                          "max_looks": core.MAX_LOOKS}
         return snap
 

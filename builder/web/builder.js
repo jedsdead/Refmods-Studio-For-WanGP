@@ -84,6 +84,11 @@
     let start = el.selectionStart, end = el.selectionEnd;
     if (atEnd || start == null) { start = end = el.value.length; }
     const before = el.value.slice(0, start);
+    // A sentence from a button starts with a capital, unless it follows a comma or a lowercase word.
+    if (/^(The (camera|shot|frame)|Shot (on|using)|An? |At \d)/.test(text)) {
+      const tail = before.replace(/\s+$/, "");
+      if (/[,;:]$|[a-z]$/.test(tail)) text = text[0].toLowerCase() + text.slice(1);
+    }
     const pad = before && !/\s$/.test(before) && !/^\s/.test(text) ? " " : "";
     el.setRangeText(pad + text, start, end, "end");
     el.focus();
@@ -93,13 +98,17 @@
   async function snippet(kind) {
     const args = {
       at: parseFloat($("at").value) || 0, move: $("camMove").value, amplitude: $("camAmp").value, speed: $("camSpeed").value,
+      framing: $("camFraming").value, rig: $("camRig").value, lens: $("camLens").value, of: $("camOf").value, verb: $("camVerb").value,
+      body: $("gearBody").value,
       index: kind === "line" ? parseInt($("dWho").value || "0", 10) : parseInt($("subjSel").value || "0", 10),
       tone: $("dTone").value, language: $("dLang").value, voiceover: $("dVo").checked, line: $("dLine").value,
     };
     if ((kind === "subject" || kind === "line") && !args.index) { status("Add a subject first."); return; }
     if (kind === "line" && !args.line.trim()) { status("Type the line first."); $("dLine").focus(); return; }
+    if (kind === "gear") args.lens = $("gearLens").value;
     const { text } = await api("snippet", { kind, form: S.form, args });
-    if (!text) return;
+    if (!text) { if (kind === "camera") status("Pick a framing, rig, lens, what's in frame or a move first."); return; }
+    if (kind === "gear") { insertInto("style", text, true); return; }
     if (kind === "subject") insertInto(S.lastBox, text, false);
     else insertInto("action", text, !S.actionUsed);
     if (kind === "line") $("dLine").value = "";
@@ -595,7 +604,10 @@
       const fresh = s.captured_at !== S.capturedAt;
       S.session = s; S.vocab = s.vocab; S.capturedAt = s.captured_at;
       if (first) {
-        options($("camMove"), S.vocab.camera, "Push In");
+        options($("camMove"), [["", "move"]].concat(S.vocab.camera.map((m) => [m, m])), "");
+        options($("camVerb"), [["", "Auto"]].concat(S.vocab.cuts.map((v) => [v, v.replace("the ", "")]), S.vocab.continues.map((v) => [v, v.replace("the ", "")])), "");
+        const list = (id, items) => { $(id).innerHTML = items.filter(Boolean).map((v) => `<option value="${esc(v)}">`).join(""); };
+        list("lsFraming", S.vocab.framings); list("lsRig", S.vocab.rigs); list("lsLens", S.vocab.lenses); list("lsBody", S.vocab.bodies);
         options($("camAmp"), S.vocab.amplitudes.map((a) => [a, a || "amplitude"]), "");
         options($("camSpeed"), S.vocab.speeds.map((a) => [a, a || "speed"]), "");
         options($("dLang"), S.vocab.languages, "English");

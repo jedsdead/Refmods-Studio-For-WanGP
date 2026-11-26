@@ -71,15 +71,23 @@
         <button data-snip="time">Time</button>
         <button data-snip="shot">Shot</button>
         <span class="sep"></span>
-        <select id="camMove" aria-label="Camera move"></select>
-        <select id="camAmp" aria-label="Amplitude"></select>
-        <select id="camSpeed" aria-label="Speed"></select>
-        <button data-snip="camera">Camera</button>
-        <span class="sep"></span>
         <select id="subjSel" aria-label="Subject"></select>
         <button data-snip="subject">Subject</button>
         <span class="sep"></span>
         <button id="btnPhrases" title="Wording you reuse. Select text in a box and press Ctrl+Enter to save it as one">Phrases</button>
+      </div>
+      <div class="row camera" title="Framing and rig make one shot: a medium crane shot. Every box can be typed in.">
+        <span class="cap">Camera</span>
+        <select id="camVerb" aria-label="Cut or move"></select>
+        <input id="camFraming" list="lsFraming" placeholder="framing: medium" aria-label="Framing" class="cam">
+        <input id="camRig" list="lsRig" placeholder="rig: crane" aria-label="Rig" class="cam">
+        <input id="camLens" list="lsLens" placeholder="lens" aria-label="Lens" class="cam">
+        <input id="camOf" placeholder="of: !Jodi at the bar" aria-label="What's in frame" class="grow">
+        <select id="camMove" aria-label="Camera move"></select>
+        <select id="camAmp" aria-label="Amplitude"></select>
+        <select id="camSpeed" aria-label="Speed"></select>
+        <button data-snip="camera" class="primary">Insert camera</button>
+        <datalist id="lsFraming"></datalist><datalist id="lsRig"></datalist><datalist id="lsLens"></datalist>
       </div>
       <div class="row dialogue">
         <span class="cap">Line</span>
@@ -90,7 +98,7 @@
         <input id="dLine" placeholder="The line, word for word" aria-label="Line" class="grow">
         <button data-snip="line" class="primary">Insert line</button>
       </div>
-      <div class="muted small">Time, Shot, Camera and lines go into Action at its cursor. Subject and labels go into the box you last clicked. Type <b>!Name</b> for a subject (Tab completes it). Right-click a tag to swap or remove it.</div>
+      <div class="muted small">Time, Shot, Camera and lines go into Action at its cursor; the camera's Auto verb cuts at a new shot and moves within one. Subject and labels go into the box you last clicked. Type <b>!Name</b> for a subject (Tab completes it). Right-click a tag to swap or remove it.</div>
     </section>
 
     <section class="field">
@@ -99,7 +107,10 @@
       <textarea id="summary" rows="2" class="box"></textarea>
     </section>
     <section class="field">
-      <div class="field-head"><label for="style">Style</label><span class="muted small">stays the same for the whole clip</span></div>
+      <div class="field-head"><label for="style">Style</label><span class="muted small">stays the same for the whole clip</span><span class="grow"></span>
+        <input id="gearBody" list="lsBody" placeholder="shot on: an Arri Alexa…" aria-label="Camera or film" class="cam" style="width:190px">
+        <input id="gearLens" list="lsLens" placeholder="using: a 35mm lens" aria-label="Lens" class="cam" style="width:170px">
+        <button class="small" data-snip="gear">Add</button><datalist id="lsBody"></datalist></div>
       <textarea id="style" rows="1" class="box" placeholder="Live-action, cinematic, 35mm, teal and amber grade, night"></textarea>
     </section>
     <section class="field">
