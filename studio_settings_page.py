@@ -31,6 +31,7 @@ header { display: flex; align-items: center; gap: 12px; white-space: nowrap; mar
 header h1 { font-size: 16px; margin: 0; } .grow { flex: 1; }
 .muted { color: var(--muted); } .small { font-size: 12px; }
 button { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line2); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+select { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line2); border-radius: 6px; padding: 4px 8px; }
 button:hover { border-color: var(--accent); } button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
 .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 8px; }
@@ -65,6 +66,13 @@ code { font-size: 12px; }
       <span class="muted small">Writes H3 prompts from what the Generator page sends. Without Refmods it works the same,
       minus packs and armed mods.</span></span></label>
     <div class="row"><button class="primary" id="save">Save</button><span id="note" class="small"></span></div>
+  </section>
+
+  <section class="card">
+    <h2>Page size</h2>
+    <p class="muted small" style="margin-top:0">Makes Refmods, the Prompt Builder and this page smaller or larger, without
+      zooming the rest of WanGP. It applies straight away; this browser remembers it.</p>
+    <div class="row"><select id="zoom" aria-label="Page size"></select><button id="zoomReset">100%</button></div>
   </section>
 
   <section class="card" id="problemsCard" hidden>
@@ -136,6 +144,22 @@ code { font-size: 12px; }
     });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && button && document.documentElement.classList.contains("rs-full")) button.click(); });
   }
+  function applyZoom() {
+    let z = 1;
+    try { z = parseFloat(localStorage.getItem("refmods-studio.zoom")) || 1; } catch (_) { /* no storage here */ }
+    z = Math.min(1.3, Math.max(0.8, z));
+    document.documentElement.style.zoom = z;
+    $("zoom").value = String(Math.round(z * 100));
+  }
+  $("zoom").innerHTML = [80, 90, 100, 110, 120, 130].map((p) => `<option value="${p}">${p}%</option>`).join("");
+  const setZoom = (p) => {
+    try { localStorage.setItem("refmods-studio.zoom", String(p / 100)); } catch (_) { /* no storage here */ }
+    applyZoom();   // the other pages hear it through the storage event
+  };
+  $("zoom").addEventListener("change", (e) => setZoom(+e.target.value));
+  $("zoomReset").addEventListener("click", () => setZoom(100));
+  window.addEventListener("storage", (e) => { if (e.key === "refmods-studio.zoom") applyZoom(); });
+  applyZoom();
   theme();
   try { new MutationObserver(theme).observe(window.parent.document.body, { attributes: true, attributeFilter: ["class"] }); } catch (_) { /* on its own */ }
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { theme(); load(); } });

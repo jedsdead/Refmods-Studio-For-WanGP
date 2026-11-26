@@ -132,6 +132,9 @@ Nothing needs moving:
 all (turning off Refmods also removes its pipeline hooks), and the other keeps working. Without Refmods, the Prompt
 Builder hides its pack buttons, since packs and armed mods come from Refmods.
 
+**Page size** on the same subtab makes the three pages smaller or larger (80% to 130%) without zooming the rest of
+WanGP. It applies straight away, and the browser remembers it.
+
 ## Credits
 
 - **Luisa** ([ComfyUI-MiniMaxH3Mod](https://github.com/Luisacaotica/ComfyUI-MiniMaxH3Mod)): the RefMod idea and

@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.1] — 2026-11-26
+
+- **Page size** on the Settings subtab makes Refmods, the Prompt Builder and Settings smaller or larger (80% to
+  130%) without zooming the rest of WanGP. It applies straight away to all three, and the browser remembers it.
+- The Prompt Builder's subject cards share the row and widen into the free space (up to a card's width, so one
+  subject doesn't stretch across the page); long names are cut short instead of wrapping.
+- An age typed in full ("in her 40s") no longer comes out as "in her in her 40s".
+- The Packs page's note names the Prompt Builder's **Load pack**.
+- The README has screenshots, made with invented mods and placeholder pictures, and its out-of-date lines are fixed.
+
 ## [1.0.0] — 2026-11-26
 
 First release of Refmods Studio: Refmods and the MiniMax H3 Prompt Builder in one plugin, both as web apps in one
@@ -14,10 +24,6 @@ tab with a full-screen mode. The entries below are the changes on the way here.
   height.
 - In full screen, each page's switch lists the subtabs that exist, Settings included.
 - Without Refmods, the Prompt Builder hides its pack buttons.
-- The README has screenshots, made with invented mods and placeholder pictures.
-- The Prompt Builder's subject cards share the row and widen into the free space (up to a card's width, so one
-  subject doesn't stretch across the page); long names are cut short instead of wrapping.
-- An age typed in full ("in her 40s") no longer comes out as "in her in her 40s".
 - **Flux mods have previews.** New Flux mods (including ones converted from H3) store a small JPEG of each source
   picture, so the Library shows them like an H3 mod's frames. Loaders read only the latent, so the files still work
   everywhere. Older Flux mods get a rough preview worked out from the latent (no model needed, the file isn't

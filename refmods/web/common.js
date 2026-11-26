@@ -32,6 +32,18 @@
       return r;
     } catch (e) { RS.toast(e.message, true); return null; }
   };
+  // Page size, set on the Settings subtab and shared by all three pages (same origin, so one stored value).
+  function applyZoom() {
+    let z = 1;
+    try { z = parseFloat(localStorage.getItem("refmods-studio.zoom")) || 1; } catch (_) { /* no storage here */ }
+    z = Math.min(1.3, Math.max(0.8, z));
+    document.documentElement.style.zoom = z;
+    document.documentElement.style.setProperty("--rs-zoom", z);
+  }
+  applyZoom();
+  window.addEventListener("storage", (e) => { if (e.key === "refmods-studio.zoom") applyZoom(); });
+  // Fixed-position things are placed in the page's own (zoomed) pixels, so pointer positions are divided by it.
+  RS.zoom = () => parseFloat(document.documentElement.style.zoom) || 1;
   RS.store = function (key, value) {
     try { if (value === undefined) return localStorage.getItem(key); localStorage.setItem(key, value); } catch (_) { /* no storage here */ }
     return null;

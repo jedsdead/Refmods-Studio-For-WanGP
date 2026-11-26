@@ -444,8 +444,9 @@
       `<hr><div class="h" style="text-transform:none;letter-spacing:0;font-weight:400">Shift+right-click for the browser's menu</div>`;
     menu.hidden = false;
     const r = menu.getBoundingClientRect();
-    menu.style.left = Math.min(e.clientX, innerWidth - r.width - 8) + "px";
-    menu.style.top = Math.min(e.clientY, innerHeight - r.height - 8) + "px";
+    const z = zoom();   // pointer and box positions are in screen pixels; the menu is placed in the page's own
+    menu.style.left = Math.min(e.clientX, innerWidth - r.width - 8) / z + "px";
+    menu.style.top = Math.min(e.clientY, innerHeight - r.height - 8) / z + "px";
     menu.onclick = async (ev) => {
       const b = ev.target.closest("button"); if (!b) return;
       if (b.dataset.scope) { scope = b.dataset.scope; menu.querySelectorAll("[data-scope]").forEach((x) => x.classList.toggle("on", x === b)); return; }
@@ -501,7 +502,8 @@
     list.innerHTML = items.map((n, i) => `<div data-i="${i}" class="${i === 0 ? "on" : ""}">!${esc(n)}</div>`).join("") +
       `<div class="muted small" style="cursor:default">Tab completes · Esc closes</div>`;
     list.hidden = false;
-    list.style.left = r.left + 8 + "px"; list.style.top = Math.min(r.bottom + 2, innerHeight - list.offsetHeight - 6) + "px";
+    const z = zoom();
+    list.style.left = (r.left + 8) / z + "px"; list.style.top = Math.min(r.bottom + 2, innerHeight - list.offsetHeight * z - 6) / z + "px";
     list.onmousedown = (e) => { const d = e.target.closest("[data-i]"); if (d) { e.preventDefault(); sug.i = +d.dataset.i; completeName(); } };
   }
   function hideSuggest() { $("suggest").hidden = true; sug.box = null; }
@@ -940,6 +942,18 @@
     document.addEventListener("visibilitychange", () => { if (!document.hidden) { theme(); loadSession(false); } });
     try { new MutationObserver(theme).observe(window.parent.document.body, { attributes: true, attributeFilter: ["class"] }); } catch (_) { /* on its own */ }
   }
+
+  // Page size, set on the Settings subtab and shared by all three pages (same origin, so one stored value).
+  function applyZoom() {
+    let z = 1;
+    try { z = parseFloat(localStorage.getItem("refmods-studio.zoom")) || 1; } catch (_) { /* no storage here */ }
+    z = Math.min(1.3, Math.max(0.8, z));
+    document.documentElement.style.zoom = z;
+    document.documentElement.style.setProperty("--rs-zoom", z);
+  }
+  applyZoom();
+  window.addEventListener("storage", (e) => { if (e.key === "refmods-studio.zoom") applyZoom(); });
+  const zoom = () => parseFloat(document.documentElement.style.zoom) || 1;
 
   async function start() {
     theme();
