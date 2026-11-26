@@ -235,18 +235,51 @@
     }).join("");
   }
 
+  // ---------------------------------------------------------------- full screen (WanGP's own, as the Video Editor uses)
+  const SVG = (d) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+  const EXPAND = SVG("M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"), EXIT = SVG("M10 4H5v16h5M14 8l4 4-4 4M18 12H9");
+  RS.fullscreen = function (container, switcher) {
+    let button = null, pdoc = null;
+    try {
+      const nav = window.parent !== window && window.frameElement && window.parent.WanGPAddonNavigation;
+      if (!nav) return;
+      const before = container.children.length;
+      nav.headerButton(window.frameElement, container, "fsbtn");
+      button = container.children.length > before ? container.lastElementChild : null;
+      pdoc = window.parent.document;
+    } catch (_) { return; }                        // opened on its own, or an older WanGP
+    // Both Refmods Studio pages have a button, so each keeps its own icon in step.
+    const paint = () => {
+      const on = pdoc.documentElement.classList.contains("wangp-addon-fullscreen-open");
+      document.documentElement.classList.toggle("rs-full", on);
+      if (button) { button.title = on ? "Back to WanGP (Esc)" : "Open Full Screen"; button.setAttribute("aria-label", button.title); button.innerHTML = on ? EXIT : EXPAND; }
+    };
+    new MutationObserver(paint).observe(pdoc.documentElement, { attributes: true, attributeFilter: ["class"] });
+    paint();
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !e.defaultPrevented && button && document.documentElement.classList.contains("rs-full") &&
+          !document.querySelector("dialog[open], .zoom")) button.click();
+    });
+    // In full screen the frame covers WanGP's subtab bar, so the page offers the switch itself.
+    if (switcher) switcher.querySelectorAll("button[data-sub]").forEach((b) => b.addEventListener("click", () => {
+      const tab = [...pdoc.querySelectorAll(".rs-studio-tabs button[role=tab]")].find((t) => t.textContent.trim() === b.dataset.sub);
+      if (tab) tab.click();
+    }));
+  };
+
   // ---------------------------------------------------------------- start
   async function start() {
     RS.theme();
     document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => RS.show(b.dataset.view)));
     $("model").addEventListener("change", (e) => { RS.store("refmods.model", e.target.value); Object.values(RS.views).forEach((v) => v.model && v.model()); });
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { const z = document.querySelector(".zoom"); if (z) z.remove(); } });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { const z = document.querySelector(".zoom"); if (z) { z.remove(); e.preventDefault(); } } });
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) { RS.theme(); const v = RS.views[RS.current]; if (v && v.refresh) v.refresh(); }
     });
     try { new MutationObserver(RS.theme).observe(window.parent.document.body, { attributes: true, attributeFilter: ["class"] }); } catch (_) { /* on its own */ }
     try { await loadSession(); } catch (e) { RS.toast("Could not reach the plugin: " + e.message, true); }
     for (const v of Object.values(RS.views)) { try { if (v.init) await v.init(); } catch (e) { console.error(e); } }
+    RS.fullscreen($("fsBox"), $("subSwitch"));
     const hash = location.hash.replace("#", "");
     RS.show(RS.views[hash] ? hash : (RS.store("refmods.view") || "library"));
     try {

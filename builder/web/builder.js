@@ -358,6 +358,37 @@
     if (r.ok) { packNames = ""; await loadPacks(); $("packSel").value = r.name; }
   }
 
+  // ---------------------------------------------------------------- full screen (WanGP's own, as the Video Editor uses)
+  function fullscreen() {
+    const SVG = (d) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+    const EXPAND = SVG("M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"), EXIT = SVG("M10 4H5v16h5M14 8l4 4-4 4M18 12H9");
+    const box = $("fsBox");
+    let button = null, pdoc = null;
+    try {
+      const nav = window.parent !== window && window.frameElement && window.parent.WanGPAddonNavigation;
+      if (!nav) return;
+      const before = box.children.length;
+      nav.headerButton(window.frameElement, box, "fsbtn");
+      button = box.children.length > before ? box.lastElementChild : null;
+      pdoc = window.parent.document;
+    } catch (_) { return; }
+    const paint = () => {
+      const on = pdoc.documentElement.classList.contains("wangp-addon-fullscreen-open");
+      document.documentElement.classList.toggle("rs-full", on);
+      if (button) { button.title = on ? "Back to WanGP (Esc)" : "Open Full Screen"; button.setAttribute("aria-label", button.title); button.innerHTML = on ? EXIT : EXPAND; }
+    };
+    new MutationObserver(paint).observe(pdoc.documentElement, { attributes: true, attributeFilter: ["class"] });
+    paint();
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !e.defaultPrevented && button && document.documentElement.classList.contains("rs-full") &&
+          !document.querySelector("dialog[open]")) button.click();
+    });
+    $("subSwitch").querySelectorAll("button[data-sub]").forEach((b) => b.addEventListener("click", () => {
+      const tab = [...pdoc.querySelectorAll(".rs-studio-tabs button[role=tab]")].find((t) => t.textContent.trim() === b.dataset.sub);
+      if (tab) tab.click();
+    }));
+  }
+
   // ---------------------------------------------------------------- session
   async function loadSession(first) {
     try {
@@ -474,6 +505,7 @@
   async function start() {
     theme();
     wire();
+    fullscreen();
     await loadSession(true);
     const draft = await api("draft").catch(() => ({ ok: false }));
     if (draft.ok) loadForm(draft.form, draft.note); else loadForm(null, "");

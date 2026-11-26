@@ -1,6 +1,7 @@
 # Refmods Studio
 
 Refmods and the MiniMax H3 Prompt Builder in one WanGP plugin, on one **Refmods Studio** tab with a subtab for each.
+The button at the right of either page's header opens it full screen; Esc goes back.
 
 - **Refmods**: no-training reference mods for MiniMax H3 (Ref2VA, FL2VA, FL2VA ControlNet, H3-Image, P-H3-Image)
   and Flux 2 / Flux 3. Compress a reference into a small `.safetensors` file once, then reuse it at any strength

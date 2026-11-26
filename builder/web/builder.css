@@ -91,3 +91,10 @@ dialog::backdrop { background: rgba(0, 0, 0, .5); }
 .dlg { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
 .dlg h2 { margin: 0; font-size: 16px; }
 @media (max-width: 760px) { .grid5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid3, .pair { grid-template-columns: 1fr; } }
+
+/* full screen (WanGP's own) */
+.fsbox { display: inline-flex; }
+.fsbtn { display: inline-grid; place-items: center; width: 32px; height: 30px; padding: 0; border-radius: 7px; }
+.subswitch { display: none !important; } .rs-full .subswitch { display: inline-flex !important; }
+.subswitch button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+#packSel { max-width: 170px; }

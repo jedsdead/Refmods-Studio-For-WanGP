@@ -17,8 +17,10 @@
     <button role="tab" data-view="setup">Setup</button>
   </div>
   <span class="grow"></span>
+  <div class="seg subswitch" id="subSwitch" title="Switch page"><button data-sub="Refmods" class="on">Refmods</button><button data-sub="Prompt Builder">Prompt Builder</button></div>
   <label class="inline" title="Creating, decoding, strength previews, encoder frames and soundtracks run as a short task on this model">MiniMax H3 model
     <select id="model" aria-label="MiniMax H3 model"></select></label>
+  <span id="fsBox" class="fsbox"></span>
 </nav>
 
 <!-- ============================================================ Library -->
@@ -110,7 +112,7 @@
           <label class="inline pps">Pictures per second <input type="number" id="cPps" class="num" min="0.25" max="12" step="0.25" value="1"></label>
         </div>
         <div class="opt h3-only audio-opt">
-          <label class="inline">Audio length <input type="number" id="cAudioSecs" class="num" min="2" max="15" step="0.5" value="4"> s</label>
+          <label class="inline" title="How much of the sound to keep. A trimmed audio file keeps its trim instead.">Audio length <input type="number" id="cAudioSecs" class="num" min="2" max="15" step="0.5" value="4"> s</label>
           <label class="inline clip-audio"><input type="checkbox" id="cClipAudio"> Use the clip's own sound</label>
           <label class="inline"><input type="checkbox" id="cCleanAudio"> Remove music and noise</label>
         </div>

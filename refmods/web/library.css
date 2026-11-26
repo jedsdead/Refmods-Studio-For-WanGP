@@ -227,3 +227,8 @@ code { font: 12px ui-monospace, Menlo, Consolas, monospace; background: var(--pa
 .tl-play { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 2px #000; pointer-events: none; z-index: 1; }
 #trimIn { margin-left: 0; } #trimIn::after { left: 0; }
 #trimOut { margin-left: -14px; } #trimOut::after { left: auto; right: 0; }
+
+/* full screen */
+.fsbox { display: inline-flex; }
+.fsbtn { display: inline-grid; place-items: center; width: 32px; height: 30px; padding: 0; border-radius: 7px; }
+.subswitch { display: none; } .rs-full .subswitch { display: inline-flex; }

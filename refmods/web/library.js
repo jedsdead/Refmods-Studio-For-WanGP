@@ -404,7 +404,9 @@
         if (r && r.token) { S.sndToken = r.token; S.sndName = f.name; if ($("sndName")) $("sndName").textContent = f.name; toast("Ready: " + f.name); }
       });
       document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && RS.current === "library" && S.picked.size && !document.querySelector(".zoom")) { S.picked.clear(); renderGrid(); renderBulk(); }
+        if (e.key === "Escape" && RS.current === "library" && S.picked.size && !document.querySelector(".zoom") && !e.defaultPrevented) {
+          S.picked.clear(); renderGrid(); renderBulk(); e.preventDefault();
+        }
       });
       wireBulk();
     },

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.1] — 2026-11-26
+
+- **Full screen**, WanGP's own, as the Video Editor uses it. The button sits at the right of each page's header
+  (Refmods and Prompt Builder). In full screen the page fills the window, a Refmods / Prompt Builder switch appears
+  beside it, and Esc or the button goes back. `plugin_info.json` declares it (`fullscreen`, `app_url`
+  `/refmods-studio`), so WanGP's Apps menu can open Refmods Studio straight in full screen.
+- Prompt Builder: the pack picker no longer pushes Load pack onto a second line.
+
 ## [0.7.0] — 2026-11-26
 
 - **One Refmods Studio tab.** Refmods and the Prompt Builder are subtabs of it, under one settings fold.
