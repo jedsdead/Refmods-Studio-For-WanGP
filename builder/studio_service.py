@@ -101,8 +101,15 @@ class Service:
             return {"ok": False, "note": "Give the prompt a name first."}
         path = data_dir() / "prompts" / f"{filename}.json"
         existed = path.exists()
+        old = self._read_prompt(path) if existed else {}
+        try:
+            media, _, _, _ = self.resolve(core.clean_form(form))
+            packs = sorted({m.pack for m in media if getattr(m, "pack", "")})
+        except Exception:                              # noqa: BLE001
+            packs = []
         _write_json(path, {"format": 5, "saved": time.strftime("%Y-%m-%d %H:%M"), "name": filename,
-                           "form": core.clean_form(form)})
+                           "category": old.get("category", ""), "fav": bool(old.get("fav")),
+                           "packs": packs or old.get("packs") or [], "form": core.clean_form(form)})
         return {"ok": True, "name": filename, "note": f"{'Replaced' if existed else 'Saved'} {filename}."}
 
     def form_from_blob(self, blob):
@@ -128,7 +135,76 @@ class Service:
             form, note, blob = None, "", {}
         if form is None:
             return {"ok": False, "note": f"Could not read {filename}."}
-        return {"ok": True, "form": form, "note": f"Loaded {filename}, saved {blob.get('saved', 'earlier')}." + note}
+        return {"ok": True, "form": form, "packs": list(blob.get("packs") or []) if isinstance(blob, dict) else [],
+                "note": f"Loaded {filename}, saved {blob.get('saved', 'earlier')}." + note}
+
+    @staticmethod
+    def _read_prompt(path):
+        try:
+            blob = json.loads(path.read_text(encoding="utf-8"))
+            return blob if isinstance(blob, dict) else {}
+        except Exception:                              # noqa: BLE001
+            return {}
+
+    def library(self):
+        """Every saved prompt with its category, star, linked packs and the start of its action."""
+        out = []
+        for path in _files("prompts"):
+            blob = self._read_prompt(path)
+            form = blob.get("form") if isinstance(blob.get("form"), dict) else {}
+            action = " ".join(str(form.get("action") or form.get("summary") or "").split())
+            out.append({"name": path.stem, "saved": blob.get("saved", ""), "category": blob.get("category", ""),
+                        "fav": bool(blob.get("fav")), "packs": list(blob.get("packs") or []),
+                        "mode": form.get("mode", ""), "text": action[:180]})
+        out.sort(key=lambda p: (not p["fav"],))
+        return {"items": out}
+
+    def library_meta(self, name, changes):
+        """Set a saved prompt's category or star."""
+        path = data_dir() / "prompts" / f"{clean_name(name)}.json"
+        blob = self._read_prompt(path)
+        if not blob:
+            return {"ok": False, "note": f"No saved prompt called '{name}'."}
+        if "category" in changes:
+            blob["category"] = core._s(changes.get("category"))[:60]
+        if "fav" in changes:
+            blob["fav"] = bool(changes.get("fav"))
+        _write_json(path, blob)
+        return {"ok": True}
+
+    def delete_prompt(self, name):
+        path = data_dir() / "prompts" / f"{clean_name(name)}.json"
+        if not path.exists():
+            return {"ok": False, "note": f"No saved prompt called '{name}'."}
+        bin_dir = data_dir() / "prompts" / "deleted"
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        path.replace(bin_dir / path.name)   # kept in prompts/deleted, not destroyed
+        return {"ok": True, "note": f"Deleted {path.stem} (a copy is kept in prompts/deleted)."}
+
+    def load_recent(self):
+        """The most recently saved prompt."""
+        files = _files("prompts")
+        if not files:
+            return {"ok": False, "note": "No saved prompts yet."}
+        return self.load_prompt(files[0].stem)
+
+    def import_file(self, filename, text):
+        """A prompt from a file on your computer: one this builder or the 4.x one saved (.json), or plain text,
+        which goes into the action box."""
+        text = text or ""
+        try:
+            blob = json.loads(text)
+        except Exception:                              # noqa: BLE001
+            blob = None
+        if blob is not None:
+            form, note = self.form_from_blob(blob)
+            if form is None:
+                return {"ok": False, "note": f"{filename} isn't a prompt this builder can read."}
+            return {"ok": True, "form": form, "note": f"Loaded {filename}." + note}
+        if not text.strip():
+            return {"ok": False, "note": f"{filename} is empty."}
+        form = core.clean_form({"action": text.strip()})
+        return {"ok": True, "form": form, "note": f"Put the text of {filename} into Action."}
 
     def draft_path(self):
         return data_dir() / "studio_draft.json"
@@ -201,7 +277,8 @@ class Service:
         media, model = self.host.media_list()
         detected = core.auto_mode(media, model)
         mode = detected if form["mode"] in ("", core.AUTO) else form["mode"]
-        return media, model, mode, detected
+        # "Subject sections" writes a base mode (FL2VA with RefMods, say) in the reference layout.
+        return media, model, core.layout_mode(form, mode), detected
 
     def preview(self, form):
         form = core.clean_form(form)
@@ -271,10 +348,30 @@ class Service:
         if kind == "line":
             return core.dialogue_snippet(form["subjects"], int(args.get("index") or 0), media, mode, form["action"],
                                          args.get("tone", ""), args.get("language", "English"),
-                                         bool(args.get("voiceover")), args.get("line", ""), None)   # only Time writes a time
+                                         bool(args.get("voiceover")), args.get("line", ""), None,   # only Time writes a time
+                                         args.get("delivery", ""), self._stamp(args.get("same_as")), bool(args.get("cutoff")),
+                                         args.get("carry", ""))
+        if kind == "scene":
+            return core.scene_sentence(args.get("style", ""), args.get("location", ""), args.get("time", ""),
+                                       args.get("lighting", ""), args.get("atmosphere", ""), args.get("grade", ""))
+        if kind == "sound":
+            return core.sentence(args.get("text", ""))
+        if kind == "music":
+            return core.music_sentence(args.get("instruments", ""), args.get("tempo", ""), args.get("dynamics", ""))
+        if kind == "text":
+            return core.screen_text_snippet(args.get("kind", ""), args.get("words", ""))
         if kind == "summary":
             return core.draft_summary(form, mode)
         return ""
+
+    @staticmethod
+    def _stamp(value):
+        """A typed time for "same voice as line at": 1.2 becomes 00:01.200; a timestamp is kept."""
+        value = core._s(value)
+        try:
+            return core.timestamp(float(value)) if value else ""
+        except ValueError:
+            return value
 
     def draft_subjects(self, form):
         """Subjects for what's sent and not used yet: an armed pack becomes one subject with its sources
@@ -407,8 +504,7 @@ class Service:
                 if key in row and key not in m:
                     m[key] = row[key]
             m.setdefault("strength", 1.0)
-            m["mod"] = mod
-            m.pop("on", None)
+            m["mod"] = mod   # its On switch is kept: a mod switched off in the pack stays off
             return m
 
         members, skipped = [], 0

@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.9.0] — 2026-11-26
+
+Prompt Builder:
+- **The old builder's options are back**, with its sentence rules:
+  - **Scene** under Style: style, where, when, lighting, atmosphere and grade make one opening sentence ("A neo-noir
+    scene, set in a dive bar at night, lit by neon glow, with smoke haze.").
+  - **Sound** presets, and the **music composer**: instruments, then tempo, then how it develops. Add builds a box
+    up, never repeats a sentence and replaces N/A.
+  - The **Line** row has a second row: what they do as they speak ("leans in and says"), **same voice as line at**
+    (in Reference mode "in the same voice following <Audio N> as her line at …"), **Cut off** (`<cutoff>`) and
+    **carries** (`<scenetrans>` with the continuity in words). The next **Shot** writes the receiving half.
+  - **Text** writes readable text, quoted exactly: 'A neon sign reading "OPEN" is visible in the frame.'
+  - **Window length** checks: past 15 s, or past the slider's 481 frames, it says where your shots start so you can
+    split there; under 4 s it says H3 makes 107 frames at least.
+  - **Load most recent** and **Load from file…** (a .json from this builder or the old one, or a text file into
+    Action).
+- **Subject sections** (header): writes T2VA, I2VA, FL2VA or L2VA in the reference layout, with subject definitions,
+  retention and the rest, as the H3 guide asks for RefMods in FL2VA. `!Name` gives tags there.
+- **Coloured tags** in every box: subjects, pictures, videos, audio, shots and times, lines, `<scenetrans>`/`<cutoff>`
+  and `!Name`.
+- **Prompt library**: search your saved prompts, star them, sort them into categories, delete them (a copy is kept
+  in `prompts/deleted`). A prompt remembers the packs it used, and **Load + arm packs** arms them again.
+- **Scratchpad** under Action, saved with the prompt: **Pull from Action** and **Commit to Action** (Undo brings the
+  old action back).
+- The right-click menu closes when you click anywhere else, scroll, or leave the page.
+- **Save as pack** kept turning switched-off mods back on. It keeps their **On** switch now.
+
+Refmods:
+- **Include switched-off mods** in the panel's pack row: off (the default), Add pack, Replace all and the Prompt
+  Builder's Load pack leave out mods switched off in the pack; on, they load everything.
+- **Create**: videos can be cropped, turned and mirrored (on one of their frames; ffmpeg makes the copy and keeps
+  the sound). Pictures get **To subject** (crop to the person or object) and **Blur back** (blur the background),
+  both with Wan2GP's background removal. The original stays, and the crop dialog's reset brings it back.
+- Background removal uses Wan2GP's own remover when the `rembg` package isn't installed.
+
 ## [0.8.2] — 2026-11-26
 
 - **Presets keep coming across.** Packs are checked against `presets.json` every time they're listed, so presets saved

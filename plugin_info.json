@@ -1,6 +1,6 @@
 {
     "name": "Refmods Studio",
-    "version": "0.8.2",
+    "version": "0.9.0",
     "description": "Refmods and the MiniMax H3 Prompt Builder in one plugin. Reference mods for MiniMax H3 and Flux 2 / Flux 3 (compress a reference once, reuse it at any strength), and a prompt builder for H3 T2VA, I2VA, FL2VA, L2VA and Ref2VA.",
     "author": "JedsDeadBaby; Refmods built on g3n3rativ3's Wan2GP port of Luisa's ComfyUI-MiniMaxH3Mod",
     "date": "2026-11-25",

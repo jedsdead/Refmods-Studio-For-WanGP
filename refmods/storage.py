@@ -991,11 +991,26 @@ def remove_background_from_image(img: Image.Image, session=None, bg_color=(255, 
     main Media Generator form. Only meant for still images: Wan2GP's own
     background removal only applies to reference *images*, not reference
     videos, and this plugin follows the same rule."""
-    from rembg import remove
+    try:
+        from preprocessing.rembg.native import remove      # newer Wan2GP ships its own
+    except Exception:
+        from rembg import remove
     if session is None:
         session = new_rembg_session()
     return remove(img.convert("RGB"), session=session, alpha_matting_erode_size=1,
                  alpha_matting=True, bgcolor=list(bg_color) + [0]).convert("RGB")
+
+
+def subject_mask(img: Image.Image, session=None) -> Image.Image:
+    """A greyscale mask of the person or object in a picture (white where it is), from the same background
+    removal Wan2GP uses."""
+    try:
+        from preprocessing.rembg.native import remove
+    except Exception:
+        from rembg import remove
+    if session is None:
+        session = new_rembg_session()
+    return remove(img.convert("RGB"), session=session, only_mask=True).convert("L")
 
 
 # ── Decompile output ────────────────────────────────────────────────────────

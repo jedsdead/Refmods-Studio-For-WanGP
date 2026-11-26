@@ -179,6 +179,14 @@ def create_app(plugin, model_lists):
     def estimate(payload: dict = Body(...)):
         return act(create_service.estimate, payload.get("form") or {}, payload.get("sources") or [])
 
+    @app.post("/api/picture_tool")
+    def picture_tool(payload: dict = Body(...)):
+        return act(create_service.picture_tool, payload.get("token"), payload.get("op"), payload.get("amount"))
+
+    @app.post("/api/process_video")
+    def process_video(payload: dict = Body(...)):
+        return act(create_service.process_video, payload.get("token"), payload.get("ops") or [], payload.get("crop"))
+
     @app.post("/api/cut_audio")
     def cut_audio(payload: dict = Body(...)):
         return act(create_service.cut_audio, payload.get("token"), payload.get("start"), payload.get("end"))

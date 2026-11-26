@@ -333,3 +333,63 @@ def cut_audio(token, start, end):
             raise ValueError("no sound could be read from that file")
         storage.save_wav(waveform[0] if waveform.dim() == 3 else waveform, out)
     return probe(os.path.basename(out))
+
+
+# -- picture and video tools --------------------------------------------------------
+
+def _new_upload(path, suffix, ext):
+    stem = os.path.splitext(os.path.basename(path).split("_", 1)[-1])[0]
+    return os.path.join(lib.uploads_dir(), f"{os.urandom(4).hex()}_{stem}_{suffix}{ext}")
+
+
+def picture_tool(token, op, amount=None):
+    """"subject": crop to the person or object, with a little room around it. "blur": blur everything behind
+    them. Both find the subject with Wan2GP's background removal and save a new upload; the original stays."""
+    from PIL import Image, ImageFilter
+    path = lib.upload_path(token)
+    if not path:
+        raise FileNotFoundError(token)
+    with Image.open(path) as im:
+        img = im.convert("RGB")
+    mask = storage.subject_mask(img)
+    box = mask.point(lambda v: 255 if v > 128 else 0).getbbox()
+    if not box:
+        raise ValueError("no person or object stood out from the background")
+    if op == "subject":
+        pad = max(8, int(0.08 * max(box[2] - box[0], box[3] - box[1])))
+        box = (max(0, box[0] - pad), max(0, box[1] - pad), min(img.width, box[2] + pad), min(img.height, box[3] + pad))
+        out = img.crop(box)
+        target = _new_upload(path, "subject", ".png")
+    elif op == "blur":
+        radius = float(amount or 0) or max(4.0, max(img.size) / 60)
+        back = img.filter(ImageFilter.GaussianBlur(radius))
+        out = Image.composite(img, back, mask.filter(ImageFilter.GaussianBlur(2)))
+        target = _new_upload(path, "blurred", ".png")
+    else:
+        raise ValueError(f"unknown picture tool {op!r}")
+    out.save(target)
+    return probe(os.path.basename(target))
+
+
+def process_video(token, ops, crop):
+    """A turned, mirrored and/or cropped copy of a video, made with ffmpeg; the sound is kept. ops are applied in
+    order: "r" a quarter turn clockwise, "m" a left-right flip. crop is {x, y, w, h} in pixels of the turned frame."""
+    import subprocess
+    path = lib.upload_path(token)
+    if not path:
+        raise FileNotFoundError(token)
+    filters = [{"r": "transpose=1", "m": "hflip"}[o] for o in (ops or []) if o in ("r", "m")]
+    if crop:
+        even = lambda v: max(2, int(float(v)) // 2 * 2)                  # noqa: E731  (yuv420 needs even sizes)
+        w, h = even(crop.get("w")), even(crop.get("h"))
+        x, y = max(0, int(float(crop.get("x") or 0))), max(0, int(float(crop.get("y") or 0)))
+        filters.append(f"crop={w}:{h}:{x}:{y}")
+    if not filters:
+        return probe(token)
+    target = _new_upload(path, "edited", ".mp4")
+    command = ["ffmpeg", "-y", "-v", "error", "-i", path, "-vf", ",".join(filters), "-c:v", "libx264",
+               "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", target]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=900)
+    if result.returncode != 0 or not os.path.exists(target):
+        raise ValueError("ffmpeg couldn't edit the video: " + (result.stderr or "").strip()[-300:])
+    return probe(os.path.basename(target))

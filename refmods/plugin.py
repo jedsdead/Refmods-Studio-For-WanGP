@@ -1092,9 +1092,12 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
                 pack_replace = gr.Button("Replace all", size="sm", scale=0)
                 pack_save = gr.Button("Save as pack", size="sm", scale=0)
                 pack_delete = gr.Button("Delete pack", size="sm", scale=0)
+                pack_all = gr.Checkbox(False, label="Include switched-off mods", container=False, scale=0,
+                                       min_width=190, elem_classes="rs-packall")
             gr.Markdown("*Packs are sets of mods, each with its role. Pick one and **Add pack** puts it into "
-                        "the rows below, beside what's there; **Replace all** clears the rows first. To save "
-                        "the rows as a pack, type a name in the box. Your presets are listed as packs.*")
+                        "the rows below, beside what's there; **Replace all** clears the rows first. Mods switched "
+                        "off in the pack are left out unless **Include switched-off mods** is ticked. To save the "
+                        "rows as a pack, type a name in the box. Your presets are listed as packs.*")
             pack_bridge = gr.Textbox(value="", elem_id="rs-pack-bridge", elem_classes="rs-hidden",
                                      show_label=False, container=False, interactive=True)
             # Fork: the full panel (per-row options, sizing, text encoder).
@@ -1236,13 +1239,14 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
                             + [ui for k in kinds for ui in parts["kind_ui"][k]]
                             + [parts["shown"][k] for k in kinds])
 
-            def load_pack(state, name, replace, *row_vals):
+            def load_pack(state, name, replace, *row_vals, include_off=False):
                 name = str(name or "").strip()
                 pack = storage.read_pack(name)
                 if not pack:
                     return [state, "Pick a saved pack first."] + [gr.update()] * (len(load_outputs) - 1)
                 # Packs editor: a member switched off stays in the pack but isn't loaded.
-                members = [dict(m) for m in pack.get("members") or [] if m.get("mod") and m.get("on", True) is not False]
+                members = [dict(m) for m in pack.get("members") or []
+                           if m.get("mod") and (include_off or m.get("on", True) is not False)]
                 for m in members:
                     m.pop("on", None)
                 missing = [m["mod"] for m in members if not os.path.isfile(storage.mod_path(m["mod"]) + ".safetensors")]
@@ -1272,23 +1276,25 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
                 return [state] + _panel_restore_updates(json.dumps(payload), keep_controls=not isinstance(settings, dict),
                                                         source=source)
 
-            pack_add.click(fn=lambda st, n, *v: load_pack(st, n, False, *v), inputs=[self.state, pack_box] + row_widgets,
+            pack_add.click(fn=lambda st, n, inc, *v: load_pack(st, n, False, *v, include_off=bool(inc)),
+                           inputs=[self.state, pack_box, pack_all] + row_widgets,
                            outputs=[self.state] + load_outputs, queue=False)
-            pack_replace.click(fn=lambda st, n, *v: load_pack(st, n, True, *v),
-                               inputs=[self.state, pack_box] + row_widgets,
+            pack_replace.click(fn=lambda st, n, inc, *v: load_pack(st, n, True, *v, include_off=bool(inc)),
+                               inputs=[self.state, pack_box, pack_all] + row_widgets,
                                outputs=[self.state] + load_outputs, queue=False)
 
             # The Prompt Builder's Load pack writes {"name", "replace"} here; the panel loads it as Add pack does.
-            def bridge_load(state, request, *row_vals):
+            def bridge_load(state, request, include_off, *row_vals):
                 try:
                     req = json.loads(request or "{}")
                 except Exception:
                     req = {}
                 if not req.get("name"):
                     return [state] + [gr.update()] * len(load_outputs)
-                return load_pack(state, req["name"], bool(req.get("replace")), *row_vals)
+                return load_pack(state, req["name"], bool(req.get("replace")), *row_vals,
+                                 include_off=bool(req.get("all", include_off)))
 
-            pack_bridge.change(fn=bridge_load, inputs=[self.state, pack_bridge] + row_widgets,
+            pack_bridge.change(fn=bridge_load, inputs=[self.state, pack_bridge, pack_all] + row_widgets,
                                outputs=[self.state] + load_outputs, queue=False)
         else:
             for button in (pack_add, pack_replace):

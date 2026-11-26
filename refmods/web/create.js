@@ -83,10 +83,11 @@
         : s.kind === "video" ? `<video src="${fileUrl(s.token)}#t=${(s.start || 0) + 0.1}" muted preload="metadata"></video>`
         : `<div class="ph"><b>♪</b>audio</div>`;
       const facts = s.kind === "image" ? `${s.width}×${s.height}` : s.kind === "video" ? `${s.width}×${s.height} · ${(+s.seconds || 0).toFixed(1)}s` : `${s.seconds != null ? (+s.seconds).toFixed(1) + "s" : ""}`;
-      const tools = s.kind === "image" ? `<div class="row"><button class="small cCrop">Crop</button>${s.orig ? `<span class="muted">cropped</span>` : ""}</div>`
-        : s.kind === "video" && S.family === "flux" ? `<span class="muted">the whole video</span>`
+      const edited = s.orig ? `<span class="muted">${s.kind === "video" ? "edited" : "cropped"}</span>` : "";
+      const tools = s.kind === "image" ? `<div class="row"><button class="small cCrop">Crop</button><button class="small cSubj" title="Crop to the person or object, found with Wan2GP's background removal">To subject</button><button class="small cBlur" title="Blur everything behind the person or object">Blur back</button>${edited}</div>`
+        : s.kind === "video" && S.family === "flux" ? `<div class="row"><span class="muted">the whole video</span><button class="small cCrop" title="Crop, turn or mirror the video">Crop…</button>${edited}</div>`
         : `<div class="trim">Use <input type="number" class="tA" min="0" max="${s.seconds}" step="0.1" value="${(+s.start || 0).toFixed(1)}"> to <input type="number" class="tB" min="0" max="${s.seconds}" step="0.1" value="${(+s.end || 0).toFixed(1)}"> s</div>
-           <div class="row"><button class="small cTrim">Trim…</button>${trimmed(s) ? `<span class="muted">${(s.end - s.start).toFixed(1)}s kept</span>` : ""}</div>`;
+           <div class="row"><button class="small cTrim">Trim…</button>${s.kind === "video" ? `<button class="small cCrop" title="Crop, turn or mirror the video">Crop…</button>` : ""}${trimmed(s) ? `<span class="muted">${(s.end - s.start).toFixed(1)}s kept</span>` : ""}${s.kind === "video" ? edited : ""}</div>`;
       return `<div class="src" data-i="${i}" draggable="true"><div class="pic">${pic}</div><span class="n">${label}</span>
         <button class="x" title="Remove">×</button><div class="txt"><span class="nm" title="${esc(s.name)}">${esc(s.name)}</span><span class="muted">${esc(facts)}</span>${tools}</div></div>`;
     }).join("");
@@ -94,6 +95,18 @@
       const i = +el.dataset.i, s = S.sources[i];
       el.querySelector(".x").addEventListener("click", () => { S.sources.splice(i, 1); renderSources(); changed(); });
       if (el.querySelector(".cCrop")) el.querySelector(".cCrop").addEventListener("click", () => crop(i));
+      for (const [cls, op, done] of [[".cSubj", "subject", "Cropped to the subject."], [".cBlur", "blur", "Blurred the background."]]) {
+        const b = el.querySelector(cls);
+        if (b) b.addEventListener("click", async () => {
+          b.disabled = true; toast(op === "subject" ? "Finding the subject…" : "Blurring the background…");
+          try {
+            const source = s.orig || s;
+            const r = await api("picture_tool", { token: s.token, op });
+            S.sources[i] = { ...s, token: r.token, width: r.width, height: r.height, orig: { ...source } };
+            renderSources(); changed(); toast(done);
+          } catch (e) { toast("Couldn't do that: " + e.message, true); b.disabled = false; }
+        });
+      }
       if (el.querySelector(".cTrim")) el.querySelector(".cTrim").addEventListener("click", async () => {
         const r = await RS.trim({ src: fileUrl(s.token), kind: s.kind, title: "Trim " + s.name, start: s.start, end: s.end || s.seconds,
                                   duration: s.seconds, min: s.kind === "audio" ? 2 : 0.2,
@@ -159,10 +172,31 @@
       rect = { x: (W - w) / 2, y: (H - h) / 2, w, h }; place();
     };
     img.onload = () => { scale = img.naturalWidth / img.clientWidth; fit(); };
-    img.src = fileUrl(source.token);
+    const video = source.kind === "video";
+    const ops = [];                               // a video's turns and flips, done by ffmpeg on Crop
+    if (video) {
+      // A video is cropped on one of its frames, then ffmpeg makes the edited copy.
+      const v = document.createElement("video");
+      v.muted = true; v.preload = "auto"; v.src = fileUrl(source.token);
+      v.addEventListener("loadeddata", () => { v.currentTime = Math.min((+s.start || 0) + 0.1, Math.max(0, (v.duration || 1) - 0.05)); }, { once: true });
+      v.addEventListener("seeked", () => {
+        const c = document.createElement("canvas"); c.width = v.videoWidth; c.height = v.videoHeight;
+        c.getContext("2d").drawImage(v, 0, 0); img.src = c.toDataURL("image/png");
+      }, { once: true });
+    } else img.src = fileUrl(source.token);
+    $("cropReset").textContent = video ? "Original video" : "Whole picture";
+    $("cropOk").textContent = video ? "Make the copy" : "Crop";
     // Rotate and Mirror make a turned copy of the picture to crop from; the original stays as it was.
     let work = source;
     const transform = (rotate) => {
+      if (video) {
+        const c = document.createElement("canvas"), w = img.naturalWidth, h = img.naturalHeight;
+        c.width = rotate ? h : w; c.height = rotate ? w : h;
+        const g = c.getContext("2d");
+        if (rotate) { g.translate(h, 0); g.rotate(Math.PI / 2); } else { g.translate(w, 0); g.scale(-1, 1); }
+        g.drawImage(img, 0, 0); ops.push(rotate ? "r" : "m"); img.src = c.toDataURL("image/png");
+        return;
+      }
       const c = document.createElement("canvas"), w = img.naturalWidth, h = img.naturalHeight;
       c.width = rotate ? h : w; c.height = rotate ? w : h;
       const g = c.getContext("2d");
@@ -209,7 +243,19 @@
       if (s.orig) { S.sources[index] = { ...s.orig }; renderSources(); changed(); }
       dlg.close();
     };
-    $("cropOk").onclick = () => {
+    $("cropOk").onclick = async () => {
+      if (video) {
+        const sx = Math.round(rect.x * scale), sy = Math.round(rect.y * scale), sw = Math.round(rect.w * scale), sh = Math.round(rect.h * scale);
+        const whole = sw >= img.naturalWidth - 2 && sh >= img.naturalHeight - 2;
+        if (whole && !ops.length) { dlg.close(); return; }
+        dlg.close(); toast("Making the edited copy of the video…");
+        try {
+          const r = await api("process_video", { token: source.token, ops, crop: whole ? null : { x: sx, y: sy, w: sw, h: sh } });
+          S.sources[index] = { ...s, token: r.token, width: r.width, height: r.height, seconds: r.seconds || s.seconds, orig: { ...source } };
+          renderSources(); changed(); toast("Done: the video is now the edited copy.");
+        } catch (e) { toast("Couldn't edit the video: " + e.message, true); }
+        return;
+      }
       const canvas = document.createElement("canvas");
       const sx = Math.round(rect.x * scale), sy = Math.round(rect.y * scale), sw = Math.round(rect.w * scale), sh = Math.round(rect.h * scale);
       canvas.width = sw; canvas.height = sh;

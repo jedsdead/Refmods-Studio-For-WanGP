@@ -69,6 +69,66 @@ CAMERA_BODIES = ("an IMAX camera", "IMAX 70mm film", "an Arri Alexa digital cine
                  "a Panavision camera", "Super 35mm film", "Super 16mm film", "16mm film", "8mm film", "35mm film",
                  "an 8K digital camera", "a DSLR", "a GoPro action camera", "a drone camera", "a vintage VHS camcorder",
                  "a phone camera", "a security camera", "black-and-white film stock")
+# -- the 4.x builder's scene, audio and text vocabulary (all typeable in the page) --------------------
+STYLES = ("Live-action, cinematic", "Live-action, documentary", "Observational documentary", "Handheld, naturalistic",
+          "Music-video", "Vintage film", "Found-footage", "Neo-noir", "Film noir", "Western", "Period drama",
+          "Psychological thriller", "Gothic horror", "Science-fiction epic", "Cyberpunk", "Post-apocalyptic",
+          "Space opera", "Action blockbuster", "Martial-arts film", "Romantic comedy", "Fantasy epic",
+          "French New Wave", "1970s New Hollywood", "1980s VHS aesthetic", "2D-animated", "Hand-painted anime film",
+          "Cel-shaded anime", "Modern 3D animated feature", "Stop-motion", "Claymation", "Watercolour",
+          "Oil-painted", "Comic-book panel", "Graphic-novel", "Photorealistic render")
+LOCATIONS = ("a rain-slicked alley behind a nightclub", "a farmhouse kitchen", "an airport departure lounge",
+             "a lighthouse gallery in a storm", "a rooftop garden above the city", "a motorway service station",
+             "a boat deck on open water", "a stone chapel lit by candles", "a bustling New York street",
+             "a covered market hall", "a rain-soaked city street", "a suburban kitchen", "a hotel corridor",
+             "a crowded subway platform", "a quiet library reading room", "an empty car park",
+             "a coastal fishing dock", "a pine forest clearing", "a desert highway", "a hospital waiting room",
+             "a dive bar", "an office", "a country lane", "a snowbound cabin", "a train carriage",
+             "a cathedral interior", "a warehouse floor", "a mountain ridge", "a riverbank")
+TIMES_OF_DAY = ("at dawn", "in the early morning", "in the morning", "at midday", "in the afternoon",
+                "in the late afternoon", "at golden hour", "at sunset", "at dusk", "in the evening", "at night",
+                "late at night", "at midnight", "in the small hours")
+LIGHTING = ("a single bare bulb", "car headlights sweeping across", "television glow in a dark room",
+            "shafts of light through blinds", "golden hour light", "blue hour light", "harsh midday sun",
+            "soft overcast light", "moody low-key lighting", "high-key lighting", "flickering candlelight",
+            "neon glow", "practical lamps only", "dramatic hard shadows", "rim lighting",
+            "dappled sunlight through leaves", "harsh fluorescent light", "moonlight", "firelight",
+            "diffused window light", "strobing club lighting", "sodium streetlight")
+ATMOSPHERES = ("torrential rain", "sea spray", "ash falling", "a low ground mist", "sunbeams cutting through dust",
+               "thick fog", "light mist", "drizzling rain", "drifting dust", "smoke haze", "floating particles",
+               "still, calm air", "gusting wind", "humid haze", "falling snow", "rising steam", "heat shimmer",
+               "drifting embers")
+GRADES = ("a vibrant colour grade", "a muted colour grade", "a high-contrast grade", "a teal-and-orange grade",
+          "a bleach-bypass grade", "a warm vintage film grade", "a cool desaturated grade", "a faded retro grade",
+          "a rich saturated technicolor grade", "a sepia-toned grade", "a neon cyberpunk grade", "a monochrome grade",
+          "a crushed-blacks grade", "an amber golden grade")
+SOUNDSCAPES = ("wind across an open field", "rain on a tin roof", "a fridge humming in a quiet kitchen",
+               "seagulls over a harbour", "an aircraft passing overhead", "keyboard tapping and chair creaks",
+               "hooves on cobblestones", "surf dragging over shingle", "room tone and distant traffic",
+               "rain against windows", "wind through trees", "birdsong and rustling leaves",
+               "waves against a shoreline", "a crackling fire", "crowd chatter and clinking glasses",
+               "fluorescent hum and footsteps on tile", "machinery hum", "a ticking clock in a quiet room",
+               "distant sirens", "train rumble through a tunnel", "church bells", "cicadas in the heat",
+               "creaking timber", "breathing and shifting fabric", "footsteps on gravel",
+               "near silence with faint air movement")
+INSTRUMENTS = ("a restrained solo piano", "sustained low strings", "a lone cello line", "a full string section",
+               "brushed drums and upright bass", "a muted trumpet over brushed drums", "fingerpicked acoustic guitar",
+               "electric guitar with long reverb", "warm analogue synth pads", "a pulsing synth arpeggio",
+               "harp and woodwinds", "low brass and timpani", "a heroic brass fanfare",
+               "sparse percussion and hand claps")
+TEMPOS = ("at a slow tempo", "at a moderate tempo", "at a brisk tempo", "at a driving tempo", "on a steady pulse",
+          "rubato, with no fixed pulse")
+DYNAMICS = ("held quietly under the scene", "swelling gradually, then falling away", "building steadily to a peak",
+            "entering late and fading at the end", "with no swell", "dropping out abruptly at the cut")
+SCREEN_TEXT_KINDS = ("a sign", "a neon sign", "a shopfront sign", "a street sign", "a banner", "a poster", "a label",
+                     "a subtitle", "a caption", "a screen", "a phone screen", "a handwritten note", "a letter",
+                     "a newspaper headline", "a book cover", "a badge", "a licence plate", "a chalkboard",
+                     "a departure board")
+CARRY_PHRASES = ("continues seamlessly across the cut", "continues uninterrupted into the next shot",
+                 "remains audible across the transition")
+CARRY_RECEIVE_TEXT = "The speech carries over from the previous shot."
+H3_FPS, H3_WINDOW_FRAMES_MIN, H3_WINDOW_FRAMES_MAX, H3_WINDOW_DOC_SECONDS = 24, 107, 481, (4.0, 15.0)
+
 AMPLITUDES = ("", "with small amplitude", "with large amplitude")
 SPEEDS = ("", "at slow speed", "at fast speed")
 
@@ -84,7 +144,8 @@ SUBJECT_KEYS = ("kind", "name", "gender", "age", "ethnicity", "height", "build",
 # media, so they belong to the project, not the character; the switches too.
 LIBRARY_KEYS = tuple(k for k in SUBJECT_KEYS if k not in ("look", "voice", "def_off", "ret_off"))
 
-FORM_KEYS = ("mode", "duration", "summary", "style", "action", "sound", "music", "subjects", "window_duration", "off")
+FORM_KEYS = ("mode", "duration", "summary", "style", "action", "sound", "music", "subjects", "window_duration", "off",
+             "ref_layout", "scratch")
 # Sections that can be switched off without deleting what's in them (detailed_description can't).
 SWITCHABLE = ("subject_definitions", "summary", "retention_analysis", "overall_soundscape", "non_diegetic_music")
 
@@ -101,7 +162,7 @@ def new_subject(kind="Character") -> dict:
 
 def new_form() -> dict:
     return {"mode": AUTO, "duration": 10.0, "summary": "", "style": "", "action": "", "sound": "",
-            "music": "N/A", "subjects": [], "window_duration": False, "off": []}
+            "music": "N/A", "subjects": [], "window_duration": False, "off": [], "ref_layout": False, "scratch": ""}
 
 
 def clean_look(item, parts=None, sheet=False) -> dict:
@@ -145,7 +206,14 @@ def clean_form(data) -> dict:
         form["mode"] = AUTO
     form["window_duration"] = bool(form["window_duration"])
     form["off"] = [x for x in (form["off"] or []) if x in SWITCHABLE]
+    form["ref_layout"] = bool(form["ref_layout"])
     return form
+
+
+def layout_mode(form: dict, mode: str) -> str:
+    """The format the prompt is written in. "Subject sections" turns a base mode (FL2VA with RefMods, say) into the
+    reference layout: subject_definitions, retention_analysis and the rest, as the H3 guide asks for RefMods."""
+    return "Reference" if mode == "Reference" or (form.get("ref_layout") and mode != AUTO) else mode
 
 
 # -- !Name shorthand -----------------------------------------------------------------
@@ -864,7 +932,7 @@ def checks(form: dict, media: list[Media], mode: str, text: str, detected: str, 
             if unused:
                 warnings.append(f"{join_labels(unused)} ({m.name}) is sent but never used in the prompt: it still "
                                 "loads and can show up")
-    if mode != AUTO and mode != detected and form["mode"] != AUTO:
+    if mode != AUTO and mode != detected and form["mode"] != AUTO and not form.get("ref_layout"):
         warnings.append(f"the mode is set to {mode} but what's loaded looks like {detected}")
 
     if mode == "Reference":
@@ -930,6 +998,9 @@ def checks(form: dict, media: list[Media], mode: str, text: str, detected: str, 
                         "model places any voice named there")
     if mode == "Reference" and len(re.findall(r"[.!?](\s|$)", _s(form["summary"]))) > 2:
         warnings.append("keep the summary to one or two sentences: who, where and the situation")
+    warnings += window_notes(form["duration"], form["action"])
+    if carry_pending((shots_of(form["action"]) or [(0, "")])[-1][1]):
+        info.append("the last line carries across a cut: the next Shot press writes the receiving half")
     if len(text) > PROMPT_CHAR_LIMIT:
         warnings.append(f"{len(text):,} characters is past H3's {PROMPT_CHAR_LIMIT:,}")
     info.append(f"{len(text):,} of {PROMPT_CHAR_LIMIT:,} characters")
@@ -948,10 +1019,94 @@ def _dedupe(items):
 # -- what the insert buttons write -------------------------------------------------
 
 def shot_snippet(action: str, at) -> str:
+    """The next [Shot N]. Only the Time button writes a time. When the last shot's line was set to carry across the
+    cut (an outgoing <scenetrans>), the new shot writes the receiving half the guide asks for."""
     shots = shots_of(action)
     if not shots:
         return "[Shot 1] "
-    return f"[Shot {shots[-1][0] + 1}] "   # only the Time button writes a time
+    line = f"[Shot {shots[-1][0] + 1}] "
+    if carry_pending(shots[-1][1]):
+        line += f"<scenetrans>{CARRY_RECEIVE_TEXT} "
+    return line
+
+
+def carry_pending(shot_text: str) -> bool:
+    for m in re.finditer(r"<scenetrans>", shot_text or ""):
+        if not shot_text[m.end():m.end() + 48].lstrip().lower().startswith("the speech carries over"):
+            return True
+    return False
+
+
+def scene_sentence(style="", location="", time="", lighting="", atmosphere="", grade="") -> str:
+    """The 4.x builder's opening sentence: "A neo-noir scene, set in a dive bar at night, lit by neon glow, with
+    drifting smoke, with a teal-and-orange grade." Every part is optional."""
+    style, location, time, lighting, atmosphere, grade = (_s(x) for x in (style, location, time, lighting, atmosphere, grade))
+    head = f"A {style[0].lower() + style[1:]} scene" if style else "A scene"
+    parts = [head]
+    if location:
+        parts.append(f"set in {location} {time}".rstrip())
+    elif time:
+        parts.append(time if time.startswith(("at ", "in ")) else f"taking place {time}")
+    if lighting:
+        parts.append(f"lit by {lighting}")
+    if atmosphere:
+        parts.append(f"with {atmosphere}")
+    if grade:
+        parts.append(f"with {grade}" if grade.startswith(("a ", "an ", "the ")) else f"graded with {grade}")
+    if len(parts) == 1:
+        return f"{head}." if style else ""
+    return (", ".join(parts) if style else parts[0] + " " + ", ".join(parts[1:])) + "."
+
+
+def music_sentence(instruments="", tempo="", dynamics="") -> str:
+    """Instrumentation, tempo, then dynamic development, as the guide orders them."""
+    parts = [_s(p) for p in (instruments, tempo, dynamics) if _s(p)]
+    if not parts:
+        return ""
+    head, rest = parts[0], parts[1:]
+    text = head if not rest else f"{head} {rest[0]}" if len(rest) == 1 else f"{head} {rest[0]}, {rest[1]}"
+    text = text[0].upper() + text[1:]
+    return text if text.endswith(".") else text + "."
+
+
+def sentence(text: str) -> str:
+    text = _s(text)
+    if not text:
+        return ""
+    text = text[0].upper() + text[1:]
+    return text if text.endswith((".", "!", "?")) else text + "."
+
+
+def screen_text_snippet(kind: str, words: str) -> str:
+    """Readable text, quoted as typed and never translated: 'A neon sign reading "OPEN" is visible in the frame.'"""
+    words = _s(words).strip('"').strip("'").strip()
+    if not words:
+        return ""
+    kind = _s(kind) or "a sign"
+    return f'{kind[0].upper() + kind[1:]} reading "{words}" is visible in the frame. '
+
+
+def window_notes(duration, action="") -> list:
+    """What this window's length means for H3, with the numbers."""
+    try:
+        secs = float(duration or 0)
+    except (TypeError, ValueError):
+        return []
+    if not secs:
+        return []
+    frames, (low, high) = int(round(secs * H3_FPS)), H3_WINDOW_DOC_SECONDS
+    if secs > high:
+        note = (f"{secs:g} s is {frames} frames, past the {H3_WINDOW_FRAMES_MAX} ({H3_WINDOW_FRAMES_MAX / H3_FPS:.2f} s) "
+                "the Sliding Window Size slider allows" if frames > H3_WINDOW_FRAMES_MAX else
+                f"{secs:g} s is {frames} frames, past the {high:g} s MiniMax documents for one window")
+        marks = [timestamp(t) for _, t in shot_times(action)[1:]]
+        if marks:
+            note += "; shots start at " + ", ".join(marks) + " if you'd rather split it there"
+        return [note]
+    if secs < low:
+        return [f"{secs:g} s is {frames} frames, under the {low:g} s MiniMax documents: H3 makes {H3_WINDOW_FRAMES_MIN} "
+                "frames at least, so it may raise the overlap to fill them"]
+    return []
 
 
 def shot_phrase(framing: str, rig: str) -> str:
@@ -1028,7 +1183,10 @@ def subject_snippet(subjects: list, index: int, mode: str, action: str) -> str:
 
 
 def dialogue_snippet(subjects: list, index: int, media: list[Media], mode: str, action: str, tone: str,
-                     language: str, voiceover: bool, line: str, at=None) -> str:
+                     language: str, voiceover: bool, line: str, at=None, delivery_action: str = "",
+                     same_as: str = "", cutoff: bool = False, carry: str = "") -> str:
+    """One spoken line. delivery_action is what they do as they speak ("leans in"); same_as ties the voice to an
+    earlier line ("00:01.200"); cutoff marks a line the clip ends in; carry lets it run across the next cut."""
     if not (1 <= index <= len(subjects)):
         return ""
     subject = subjects[index - 1]
@@ -1040,25 +1198,36 @@ def dialogue_snippet(subjects: list, index: int, media: list[Media], mode: str, 
     tone = _s(tone).rstrip(".")
     accent = _s(subject.get("accent"))
     bits = [f"{who} ({sid})"]
+    same_as = _s(same_as)
     if voice and reference:
-        delivery = f"in the voice following {voice}"
+        delivery = (f"in the same voice following {voice} as {pronoun(subject)} line at {same_as}" if same_as
+                    else f"in the voice following {voice}")
         if tone:
             delivery += f", with a {tone} tone"
     else:
         if reference and _s(subject.get("name")):
             bits.append(_s(subject.get("name")))
         delivery = f"a {gender_noun(subject)} speaking" + (f" with a {tone} tone" if tone else "")
+        if same_as:
+            delivery += f", in the same voice as {pronoun(subject)} line at {same_as}"
     if accent:
         delivery += f", in {'an' if accent[:1].lower() in 'aeiou' else 'a'} {accent} accent"
     bits.append(delivery)
     lead = ", ".join(bits)
+    act = _s(delivery_action).rstrip(" ,.")
+    act = re.sub(r"[\s,]*\b(?:and\s+)?says?\b[\s,]*$", "", act, flags=re.I).strip(" ,")
+    says = (f"{act[0].lower() + act[1:]} and says" if act else "says")
     words = f"<d>[{_s(language) or 'English'}] {_s(line)}</d>"
     if voiceover:
-        text = f"{lead}, says in an off-screen voiceover: {words} while {pronoun(subject)} lips remain completely closed."
+        text = f"{lead}, {says} in an off-screen voiceover: {words} while {pronoun(subject)} lips remain completely closed."
     elif voice and reference:
-        text = f"{lead}, says: {words}"
+        text = f"{lead}, {says}: {words}"
     else:
-        text = f"{lead}, says, {pronoun(subject)} lips moving: {words}"
+        text = f"{lead}, {says}, {pronoun(subject)} lips moving: {words}"
+    if cutoff:
+        text += "<cutoff>"
+    if _s(carry):
+        text += f"<scenetrans> The speech {_s(carry).rstrip('.')}."
     if at not in (None, "") and float(at or 0) > 0:
         text = f"At {timestamp(at)}, {text}"
     return text + " "

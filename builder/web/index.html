@@ -16,6 +16,7 @@
   <span class="grow"></span>
   <label class="inline">Length <input id="duration" type="number" min="1" max="60" step="0.5" value="10"> s</label>
   <label class="inline" title="Open the prompt with [/duration=…s], this sliding window's length"><input id="winDur" type="checkbox"> [/duration]</label>
+  <label class="inline" id="refLayoutBox" title="Write a base mode (FL2VA, I2VA…) with subject definitions, retention and the other reference sections, as the H3 guide asks for RefMods in FL2VA. Names become subject tags."><input id="refLayout" type="checkbox"> Subject sections</label>
   <div class="modes subswitch" id="subSwitch" title="Switch page"><button data-sub="Refmods">Refmods</button><button data-sub="Prompt Builder" class="on">Prompt Builder</button></div>
   <span id="fsBox" class="fsbox"></span>
 </header>
@@ -29,6 +30,10 @@
   <button id="btnSave">Save</button>
   <select id="loadSel" aria-label="Saved prompts"></select>
   <button id="btnLoad">Load</button>
+  <button id="btnLibrary" title="Your saved prompts: search, star, sort into categories, and arm the packs they used">Library…</button>
+  <button id="btnRecent" title="Load the prompt you saved last">Load most recent</button>
+  <button id="btnFile" title="Load a saved prompt (.json, from this builder or the old one) or a text file from your computer">Load from file…</button>
+  <input id="fileIn" type="file" accept=".json,.txt,.md" hidden>
   <button id="btnRestore">Restore draft</button>
   <button id="btnClear">Clear</button>
   <span class="sep"></span>
@@ -98,6 +103,20 @@
         <input id="dLine" placeholder="The line, word for word" aria-label="Line" class="grow">
         <button data-snip="line" class="primary">Insert line</button>
       </div>
+      <div class="row dialogue" title="Optional extras for the line above">
+        <span class="cap"></span>
+        <input id="dAct" placeholder="as they speak: leans in" aria-label="What they do as they speak" class="tone">
+        <input id="dSame" list="lsStamps" placeholder="same voice as line at…" aria-label="Same voice as their line at" class="tone">
+        <label class="inline" title="The clip ends in the middle of this line: writes &lt;cutoff&gt;"><input id="dCut" type="checkbox"> Cut off</label>
+        <select id="dCarry" aria-label="Carries across the cut" title="The line keeps going across the next cut: writes &lt;scenetrans&gt;, and the next Shot press writes the receiving half"></select>
+        <datalist id="lsStamps"></datalist>
+      </div>
+      <div class="row" title="Text that is readable in the frame, quoted exactly and never translated">
+        <span class="cap">Text</span>
+        <input id="txKind" list="lsTextKind" placeholder="on: a neon sign" aria-label="What carries the text" class="tone">
+        <input id="txWords" placeholder="the words, exactly: OPEN ALL NIGHT" aria-label="Visible text" class="grow">
+        <button data-snip="text">Insert text</button><datalist id="lsTextKind"></datalist>
+      </div>
       <div class="muted small">Time, Shot, Camera and lines go into Action at its cursor; the camera's Auto verb cuts at a new shot and moves within one. Subject and labels go into the box you last clicked. Type <b>!Name</b> for a subject (Tab completes it). Right-click a tag to swap or remove it.</div>
     </section>
 
@@ -111,6 +130,16 @@
         <input id="gearBody" list="lsBody" placeholder="shot on: an Arri Alexa…" aria-label="Camera or film" class="cam" style="width:190px">
         <input id="gearLens" list="lsLens" placeholder="using: a 35mm lens" aria-label="Lens" class="cam" style="width:170px">
         <button class="small" data-snip="gear">Add</button><datalist id="lsBody"></datalist></div>
+      <div class="row presets" title="One opening sentence: style, where, when, light, air and grade. Every box can be typed in.">
+        <input id="scStyle" list="lsStyle" placeholder="style" aria-label="Style" class="cam">
+        <input id="scLoc" list="lsLoc" placeholder="where" aria-label="Location" class="cam">
+        <input id="scTime" list="lsTime" placeholder="when" aria-label="Time of day" class="cam">
+        <input id="scLight" list="lsLight" placeholder="lit by" aria-label="Lighting" class="cam">
+        <input id="scAir" list="lsAir" placeholder="air: light mist" aria-label="Atmosphere" class="cam">
+        <input id="scGrade" list="lsGrade" placeholder="grade" aria-label="Colour grade" class="cam">
+        <button class="small" data-snip="scene">Add scene</button>
+        <datalist id="lsStyle"></datalist><datalist id="lsLoc"></datalist><datalist id="lsTime"></datalist><datalist id="lsLight"></datalist><datalist id="lsAir"></datalist><datalist id="lsGrade"></datalist>
+      </div>
       <textarea id="style" rows="1" class="box" placeholder="Live-action, cinematic, 35mm, teal and amber grade, night"></textarea>
     </section>
     <section class="field">
@@ -119,15 +148,30 @@
         <button class="small" data-enhance="action">Enhance</button><button class="small" data-undo="action">Undo</button></div>
       <textarea id="action" rows="9" class="box" placeholder="[Shot 1] … use Insert for shots, camera moves, subjects and lines"></textarea>
     </section>
+    <details class="field scratch" id="scratchBox">
+      <summary><span class="cap">Scratchpad</span> <span class="muted small">try wording here without touching the prompt · saved with it</span></summary>
+      <textarea id="scratch" rows="5" class="box" placeholder="Notes, alternative lines, a rewrite of the action…"></textarea>
+      <div class="row"><button class="small" id="btnPull" title="Copy the action box in here">Pull from Action</button>
+        <button class="small" id="btnCommit" title="Replace the action box with this (Undo on Action brings it back)">Commit to Action</button>
+        <button class="small" id="btnScratchClear">Clear</button></div>
+    </details>
     <div class="pair">
       <section class="field">
         <div class="field-head"><label for="sound">Sound</label><span class="muted small">ambience and effects, never voices</span><span class="grow"></span>
           <button class="small" data-enhance="sound">Enhance</button><button class="small" data-undo="sound">Undo</button></div>
+        <div class="row presets"><input id="sndPreset" list="lsSound" placeholder="a sound: rain against windows" aria-label="Sound preset" class="grow">
+          <button class="small" data-snip="sound">Add</button><datalist id="lsSound"></datalist></div>
         <textarea id="sound" rows="3" class="box"></textarea>
       </section>
       <section class="field">
         <div class="field-head"><label for="music">Music</label><span class="muted small">N/A unless you want a score</span><span class="grow"></span>
           <button class="small" data-enhance="music">Enhance</button><button class="small" data-undo="music">Undo</button></div>
+        <div class="row presets" title="Instruments, then tempo, then how it develops, as the guide asks">
+          <input id="muInst" list="lsInst" placeholder="instruments" aria-label="Instruments" class="cam">
+          <input id="muTempo" list="lsTempo" placeholder="tempo" aria-label="Tempo" class="cam">
+          <input id="muDyn" list="lsDyn" placeholder="dynamics" aria-label="Dynamics" class="cam">
+          <button class="small" data-snip="music">Add</button>
+          <datalist id="lsInst"></datalist><datalist id="lsTempo"></datalist><datalist id="lsDyn"></datalist></div>
         <textarea id="music" rows="3" class="box">N/A</textarea>
       </section>
     </div>
@@ -152,6 +196,13 @@
   <div class="row phsave"><textarea id="phText" rows="2" placeholder="A phrase to save: select text in a box and press Ctrl+Enter, or type it here"></textarea></div>
   <div class="row"><input id="phNewCat" placeholder="Category" list="phCats" class="num" style="width:160px"><datalist id="phCats"></datalist>
     <button id="phSave" class="primary">Save phrase</button><span class="muted small">Click a phrase to insert it where you were typing.</span><span class="grow"></span><button id="phClose">Close</button></div>
+</div></dialog>
+<dialog id="libDlg"><div class="dlg">
+  <div class="row"><h2>Prompt library</h2><span class="grow"></span><input id="libSearch" type="search" placeholder="Search" aria-label="Search prompts"><select id="libCat" aria-label="Category"></select>
+    <label class="inline small"><input id="libFav" type="checkbox"> Starred</label></div>
+  <p class="muted small">Prompts you've saved. ☆ stars one, the box beside it sets its category, and a prompt that used packs offers to arm them again when you load it.</p>
+  <div class="phlist liblist" id="libList"></div>
+  <div class="row"><span class="grow"></span><button id="libClose">Close</button></div>
 </div></dialog>
 <dialog id="writeDlg">
   <form method="dialog" class="dlg">

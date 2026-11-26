@@ -19,7 +19,8 @@ The Prompt Builder was reworked in 0.2 (below). The 4.x builder's guide is kept 
 Load your references on the Generator page as usual (start and end images, reference images, videos, audio) and arm
 any mods in the Refmods panel. The **Prompt Builder** subtab reads them:
 
-- **Mode** is picked from what's loaded, and the buttons override it.
+- **Mode** is picked from what's loaded, and the buttons override it. **Subject sections** writes a base mode
+  (FL2VA with RefMods, say) in the reference layout.
 - **What this generation sends** lists every label the pipeline will give, in its order. Click one to insert it
   where you were typing. Dashed means it's sent but not used in the prompt yet.
 - **Subjects**: name and describe each one with the character creator, then say where its look comes from (a
@@ -30,12 +31,20 @@ any mods in the Refmods panel. The **Prompt Builder** subtab reads them:
   timestamp, so a line or a shot has one only where you put it.
 - **Tags**: right-click one to swap it with another or remove it, here, in this box or everywhere (a subject goes
   with its tag). Type `!Name` for a subject; Tab completes it.
+- **Line** extras: what they do as they speak, same voice as an earlier line, **Cut off** (`<cutoff>`) and a line
+  that carries across the cut (`<scenetrans>`, with the next Shot writing the receiving half). **Text** writes
+  readable on-screen text.
+- **Scene**, **Sound** and **Music** presets compose the old builder's sentences: style, place, time, light,
+  atmosphere and grade; ambience; instruments, tempo and dynamics. Every box can be typed in.
+- Tags are **coloured** in every box. The **Scratchpad** under Action is for trying wording; Commit puts it in Action.
 - **Phrases** keeps wording you reuse: select text and press Ctrl+Enter to save it.
 - **Switches** above the preview leave a section out without deleting it; the subject editor does the same for a
   subject's definition line and retention rows.
 - **Enhance** on Action, Sound and Music asks the prompt enhancer set in Configuration to write that box.
-- The **live preview** shows the finished prompt, with the checks under it. **Insert into prompt** and **Append
-  window** put it in the prompt box.
+- The **live preview** shows the finished prompt, with the checks under it (including the window length).
+  **Insert into prompt** and **Append window** put it in the prompt box.
+- **Library…** lists your saved prompts with search, stars and categories, and arms the packs a prompt used.
+  **Load most recent** and **Load from file…** are beside it.
 
 The builder reads the Generator page each time you open the Refmods Studio tab, so load your references and arm your mods first.
 **Check the prompt box** checks whatever is in the Generator page's prompt box.
@@ -44,7 +53,8 @@ The builder reads the Generator page each time you open the Refmods Studio tab, 
 
 A pack is a set of mods, each with a role: identity, clothing, reference sheet, pose and motion, background, style
 or voice. Packs can mix anything. In the **Refmods: MiniMax H3** panel, pick a pack and **Add pack** to put its mods
-into the rows, or **Replace all** to start from it. Type a name and **Save as pack** to keep the rows. In the Prompt
+into the rows, or **Replace all** to start from it. Mods switched off in the pack are left out unless **Include
+switched-off mods** is ticked. Type a name and **Save as pack** to keep the rows. In the Prompt
 Builder, **Draft subjects** turns a character pack into one subject, each mod providing what its role says. Your old
 presets are listed as packs.
 
@@ -68,7 +78,7 @@ creating, decoding, strength previews, encoder frames and soundtracks.
   - **Replace preview** sets the picture shown for a mod. The mod itself doesn't change.
   - Ctrl-click or tick several to move, add to a pack, update or delete them together, or drag them onto a folder.
 - **Create** makes mods for MiniMax H3 or Flux. Drop pictures, videos or an audio file, drag them into order, crop
-  pictures (with rotate and mirror), and scrub through videos and audio to set in and out points; **Use frame** and **Use audio** add a still or the kept sound as a new source. Make one mod from all of them or one per picture or video, at **Full** (exact, best
+  pictures and videos (with rotate and mirror), crop a picture to its subject or blur its background, and scrub through videos and audio to set in and out points; **Use frame** and **Use audio** add a still or the kept sound as a new source. Make one mod from all of them or one per picture or video, at **Full** (exact, best
   for faces) or **Compressed** (smaller). The estimate shows the tokens and file size, and **Create** stays locked
   until the mod can be made. Every option from the old Extract tabs is under **Advanced**.
 - **Packs** edits packs: their mods, each one's role, strength (up to 2), how it's sent, its sound, and an **On**
@@ -109,6 +119,8 @@ pipeline hooks.
   file format. `refmods/core.py` is a close port of its `core.py` (MIT License, (c) 2026 Luisa/luisacaotica).
 - **g3n3rativ3** ([MiniMaxH3Mod-for-WanGP](https://github.com/g3n3rativ3/MiniMaxH3Mod-for-WanGP)): the Wan2GP port
   the Refmods half is built on. See [`docs/refmods.md`](docs/refmods.md) for what came from its later releases.
+- **Adudeguyman** ([ComfyUI-Fantastic-MiniMaxH3-PromptBuilder](https://github.com/Adudeguyman/ComfyUI-Fantastic-MiniMaxH3-PromptBuilder)):
+  the ideas for coloured tag chips, the prompt library and the scratchpad, built here in this plugin's own way.
 - **malcolmrey** ([ComfyUI-Flux2Klein9Mod](https://github.com/malcolmamal/ComfyUI-Flux2Klein9Mod)): the Flux 2 /
   Klein RefMod file layout used by the Flux mods.
 

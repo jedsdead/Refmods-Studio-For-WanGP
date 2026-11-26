@@ -102,16 +102,38 @@
       body: $("gearBody").value,
       index: kind === "line" ? parseInt($("dWho").value || "0", 10) : parseInt($("subjSel").value || "0", 10),
       tone: $("dTone").value, language: $("dLang").value, voiceover: $("dVo").checked, line: $("dLine").value,
+      delivery: $("dAct").value, same_as: $("dSame").value, cutoff: $("dCut").checked, carry: $("dCarry").value,
+      style: $("scStyle").value, location: $("scLoc").value, time: $("scTime").value, lighting: $("scLight").value,
+      atmosphere: $("scAir").value, grade: $("scGrade").value, text: $("sndPreset").value,
+      instruments: $("muInst").value, tempo: $("muTempo").value, dynamics: $("muDyn").value,
+      kind: $("txKind").value, words: $("txWords").value,
     };
     if ((kind === "subject" || kind === "line") && !args.index) { status("Add a subject first."); return; }
     if (kind === "line" && !args.line.trim()) { status("Type the line first."); $("dLine").focus(); return; }
     if (kind === "gear") args.lens = $("gearLens").value;
     const { text } = await api("snippet", { kind, form: S.form, args });
     if (!text) { if (kind === "camera") status("Pick a framing, rig, lens, what's in frame or a move first."); return; }
-    if (kind === "gear") { insertInto("style", text, true); return; }
+    if (kind === "gear" || kind === "scene") { addSentence("style", text); return; }
+    if (kind === "sound" || kind === "music") { addSentence(kind, text); return; }
     if (kind === "subject") insertInto(S.lastBox, text, false);
     else insertInto("action", text, !S.actionUsed);
-    if (kind === "line") $("dLine").value = "";
+    if (kind === "line") { $("dLine").value = ""; $("dAct").value = ""; $("dSame").value = ""; $("dCut").checked = false; $("dCarry").value = ""; }
+    if (kind === "text") $("txWords").value = "";
+  }
+  // Add buttons build a box up: a sentence already there isn't added twice, and N/A gives way.
+  function addSentence(id, text) {
+    const el = $(id);
+    const cur = el.value.trim();
+    text = text.trim();
+    if (cur.replace(/\.$/, "").toLowerCase().includes(text.replace(/\.$/, "").toLowerCase())) { status("That's already there."); return; }
+    el.value = (/^n\/a\.?$/i.test(cur) || !cur) ? text : cur + " " + text;
+    S.form[id] = el.value;
+    changed();
+  }
+  // Times of the lines already written, offered for "same voice as line at".
+  function lineStamps() {
+    const stamps = [...new Set(((S.form.action || "").match(/\bAt (\d\d:\d\d\.\d{3})/g) || []).map((t) => t.slice(3)))];
+    $("lsStamps").innerHTML = stamps.map((t) => `<option value="${t}">`).join("");
   }
 
   // ---------------------------------------------------------------- header, chips
@@ -258,11 +280,14 @@
   // ---------------------------------------------------------------- the form
   function loadForm(form, note) {
     S.form = Object.assign({ mode: "Auto", duration: 10, window_duration: false, summary: "", style: "", action: "",
-                             sound: "", music: "N/A", subjects: [], off: [] }, form || {});
+                             sound: "", music: "N/A", subjects: [], off: [], ref_layout: false }, form || {});
     S.selected = 0;
     S.tagUndo = null; $("tagUndo").hidden = true;   // an undo belongs to the prompt it was made in
     $("duration").value = S.form.duration;
     $("winDur").checked = !!S.form.window_duration;
+    $("refLayout").checked = !!S.form.ref_layout;
+    $("scratch").value = S.form.scratch || "";
+    if (S.form.scratch) $("scratchBox").open = true;
     for (const id of BOXES) $(id).value = S.form[id] || "";
     drawCards(); drawEditor(); refreshPreview();
     if (note) status(note);
@@ -272,10 +297,13 @@
       const out = await api("preview", { form: S.form });
       S.preview = out;
       $("preview").innerHTML = highlight(out.text);
+      hlAll();
       drawSections();
       $("detected").textContent = `Picked from the Generator page: ${out.summary} → ${out.detected}` +
         (S.form.mode !== "Auto" ? ` · writing ${out.mode}` : "");
       drawModes(out.detected);
+      const base = S.form.mode === "Auto" ? out.detected : S.form.mode;
+      $("refLayoutBox").hidden = base === "Reference";
       drawChips(out.unused);
       drawChecks($("checks"), out.checks);
     } catch (err) { status("Preview failed: " + err.message); }
@@ -612,6 +640,11 @@
         options($("camAmp"), S.vocab.amplitudes.map((a) => [a, a || "amplitude"]), "");
         options($("camSpeed"), S.vocab.speeds.map((a) => [a, a || "speed"]), "");
         options($("dLang"), S.vocab.languages, "English");
+        options($("dCarry"), [["", "line ends in its shot"]].concat(S.vocab.carries.map((c) => [c, "carries: " + c])), "");
+        list("lsStyle", S.vocab.styles); list("lsLoc", S.vocab.locations); list("lsTime", S.vocab.times);
+        list("lsLight", S.vocab.lighting); list("lsAir", S.vocab.atmospheres); list("lsGrade", S.vocab.grades);
+        list("lsSound", S.vocab.soundscapes); list("lsInst", S.vocab.instruments); list("lsTempo", S.vocab.tempos);
+        list("lsDyn", S.vocab.dynamics); list("lsTextKind", S.vocab.text_kinds);
       }
       options($("loadSel"), [["", "saved prompts"]].concat(s.lists.prompts), $("loadSel").value);
       options($("libSel"), [["", "saved subjects"]].concat(s.lists.subjects), $("libSel").value);
@@ -619,6 +652,102 @@
       captureNote();
       if (fresh || first) { drawEditor(); refreshPreview(); }
     } catch (err) { status("Couldn't reach the builder's server: " + err.message); }
+  }
+
+  // ---------------------------------------------------------------- coloured tag chips
+  // A layer behind each box draws the tags in colour; the box itself stays a plain textarea.
+  const HL = [
+    [/&lt;Subject \d+&gt;/g, "k-s"], [/&lt;Picture \d+&gt;/g, "k-p"], [/&lt;Video \d+&gt;/g, "k-v"], [/&lt;Audio \d+&gt;/g, "k-a"],
+    [/\[Shot \d+\]|\bAt \d\d:\d\d\.\d{3}/g, "k-shot"], [/&lt;(scenetrans|cutoff)&gt;/g, "k-x"], [/![A-Za-z][\w'-]*/g, "k-n"],
+  ];
+  function hlHtml(text) {
+    let h = esc(text);
+    h = h.replace(/&lt;d&gt;[\s\S]*?&lt;\/d&gt;/g, (m) => `\u0001d\u0002${m}\u0003`);
+    for (const [re, cls] of HL) h = h.replace(re, (m) => `\u0001${cls}\u0002${m}\u0003`);
+    return h.replace(/\u0001([\w-]+)\u0002/g, (_, c) => `<mark class="${c === "d" ? "k-d" : c}">`).replace(/\u0003/g, "</mark>") + "\n ";
+  }
+  function hlInit() {
+    for (const id of BOXES.concat(["scratch"])) {
+      const ta = $(id);
+      if (!ta || ta.parentNode.classList.contains("hlwrap")) continue;
+      const wrap = document.createElement("div");
+      wrap.className = "hlwrap";
+      ta.parentNode.insertBefore(wrap, ta);
+      const back = document.createElement("div");
+      back.className = "hlback";
+      back.setAttribute("aria-hidden", "true");
+      wrap.appendChild(back); wrap.appendChild(ta);
+      ta.addEventListener("input", () => hlSync(id));
+      ta.addEventListener("scroll", () => { back.scrollTop = ta.scrollTop; });
+      if (window.ResizeObserver) new ResizeObserver(() => hlSync(id)).observe(ta);
+    }
+    hlAll();
+  }
+  function hlSync(id) {
+    const ta = $(id), back = ta && ta.previousSibling;
+    if (!back || !back.classList || !back.classList.contains("hlback")) return;
+    const cs = getComputedStyle(ta);
+    Object.assign(back.style, {
+      top: ta.offsetTop + ta.clientTop + "px", left: ta.offsetLeft + ta.clientLeft + "px",
+      width: ta.clientWidth + "px", height: ta.clientHeight + "px",
+      padding: cs.padding, font: cs.font, lineHeight: cs.lineHeight, letterSpacing: cs.letterSpacing, tabSize: cs.tabSize,
+    });
+    back.innerHTML = hlHtml(ta.value);
+    back.scrollTop = ta.scrollTop;
+  }
+  function hlAll() { for (const id of BOXES.concat(["scratch"])) hlSync(id); }
+
+  // ---------------------------------------------------------------- prompt library
+  let libItems = [];
+  async function openLibrary() {
+    try { libItems = (await api("library")).items || []; } catch (err) { status(err.message); return; }
+    const cats = [...new Set(libItems.map((p) => p.category).filter(Boolean))].sort();
+    options($("libCat"), [["", "all categories"]].concat(cats), cats.includes($("libCat").value) ? $("libCat").value : "");
+    drawLibrary();
+    $("libDlg").showModal();
+    $("libSearch").focus();
+  }
+  function drawLibrary() {
+    const q = $("libSearch").value.trim().toLowerCase(), cat = $("libCat").value, fav = $("libFav").checked;
+    const cats = [...new Set(libItems.map((p) => p.category).filter(Boolean))];
+    const shown = libItems.filter((p) => (!cat || p.category === cat) && (!fav || p.fav) &&
+      (!q || (p.name + " " + p.text + " " + p.category + " " + p.packs.join(" ")).toLowerCase().includes(q)));
+    $("libList").innerHTML = shown.length ? shown.map((p) => `<div class="item" data-name="${esc(p.name)}">
+        <button class="star" data-star title="${p.fav ? "Unstar" : "Star"}">${p.fav ? "★" : "☆"}</button>
+        <div class="body" data-open><b>${esc(p.name)}</b> <span class="muted small">${esc(p.mode || "")} · ${esc(p.saved)}${p.packs.length ? " · packs: " + esc(p.packs.join(", ")) : ""}</span>
+          <div class="t">${esc(p.text) || "<i>empty</i>"}</div></div>
+        <input class="cat small" data-cat list="libCats" value="${esc(p.category)}" placeholder="category" aria-label="Category">
+        <button class="small" data-open>Load</button>${p.packs.length ? '<button class="small" data-arm title="Load it and arm its packs in the Refmods panel">Load + arm packs</button>' : ""}
+        <button class="small" data-del title="Moves it to prompts/deleted">Delete</button></div>`).join("")
+      + `<datalist id="libCats">${cats.map((c) => `<option value="${esc(c)}">`).join("")}</datalist>`
+      : '<div class="muted small">No saved prompts match.</div>';
+  }
+  async function libraryClick(e) {
+    const item = e.target.closest(".item");
+    if (!item) return;
+    const name = item.dataset.name, p = libItems.find((x) => x.name === name);
+    if (e.target.closest("[data-star]")) {
+      p.fav = !p.fav; await api("library/meta", { name, fav: p.fav }); drawLibrary(); return;
+    }
+    if (e.target.closest("[data-del]")) {
+      if (!item.dataset.sure) { item.dataset.sure = "1"; e.target.textContent = "Sure?"; return; }
+      const r = await api("library/delete", { name }); status(r.note);
+      libItems = libItems.filter((x) => x.name !== name); drawLibrary(); loadSession(false); return;
+    }
+    const arm = e.target.closest("[data-arm]");
+    if (arm || e.target.closest("[data-open]")) {
+      const r = await api("prompts/" + encodeURIComponent(name));
+      if (!r.ok) { status(r.note); return; }
+      $("promptName").value = name; loadForm(r.form, r.note); $("libDlg").close();
+      if (arm) {
+        for (const [i, pack] of (r.packs || []).entries()) {
+          if (i) await new Promise((ok) => setTimeout(ok, 900));
+          if (!armPack(pack)) { status("Couldn't reach the Refmods panel on the Generator page."); return; }
+        }
+        status(`Loaded ${name} and armed ${r.packs.join(", ")} in the Refmods panel.`);
+        setTimeout(() => loadSession(false), 1500);
+      }
+    }
   }
 
   // ---------------------------------------------------------------- events
@@ -634,7 +763,12 @@
       });
       el.addEventListener("blur", () => setTimeout(hideSuggest, 150));
     }
-    document.addEventListener("click", (e) => { if (!e.target.closest("#ctx")) closeMenu(); });
+    // The menu closes on any press outside it (including in another box), on scrolling, and when the page
+    // loses focus (a click elsewhere in WanGP).
+    document.addEventListener("mousedown", (e) => { if (!e.target.closest("#ctx")) closeMenu(); }, true);
+    document.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("blur", closeMenu);
+    window.addEventListener("resize", closeMenu);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("ctx").hidden) { e.preventDefault(); closeMenu(); } });
     $("tagUndo").addEventListener("click", undoTags);
     $("sections").addEventListener("click", (e) => {
@@ -659,6 +793,39 @@
     });
     $("duration").addEventListener("input", () => { S.form.duration = parseFloat($("duration").value) || 10; changed(); });
     $("winDur").addEventListener("change", () => { S.form.window_duration = $("winDur").checked; changed(); });
+    $("refLayout").addEventListener("change", () => { S.form.ref_layout = $("refLayout").checked; changed(); });
+    $("btnLibrary").addEventListener("click", openLibrary);
+    $("libClose").addEventListener("click", () => $("libDlg").close());
+    $("libSearch").addEventListener("input", drawLibrary);
+    $("libCat").addEventListener("change", drawLibrary);
+    $("libFav").addEventListener("change", drawLibrary);
+    $("libList").addEventListener("click", libraryClick);
+    $("libList").addEventListener("change", async (e) => {
+      const box = e.target.closest("[data-cat]"); if (!box) return;
+      const name = box.closest(".item").dataset.name, p = libItems.find((x) => x.name === name);
+      p.category = box.value.trim(); await api("library/meta", { name, category: p.category }); status(`${name} is in ${p.category || "no category"}.`);
+    });
+    $("scratch").addEventListener("input", () => { S.form.scratch = $("scratch").value; later("draft", saveDraft, 1500); });
+    $("btnPull").addEventListener("click", () => {
+      const cur = $("scratch").value.trim();
+      $("scratch").value = (cur ? cur + "\n\n" : "") + $("action").value; S.form.scratch = $("scratch").value; hlSync("scratch"); later("draft", saveDraft, 1500);
+    });
+    $("btnCommit").addEventListener("click", () => {
+      if (!$("scratch").value.trim()) { status("The scratchpad is empty."); return; }
+      S.undo.action = $("action").value; $("action").value = $("scratch").value; S.form.action = $("action").value; changed();
+      status("The action is now the scratchpad's text. Undo on Action brings the old one back.");
+    });
+    $("btnScratchClear").addEventListener("click", () => { $("scratch").value = ""; S.form.scratch = ""; hlSync("scratch"); later("draft", saveDraft, 1500); });
+    $("dSame").addEventListener("focus", lineStamps);
+    $("btnRecent").addEventListener("click", async () => { const r = await api("prompts_recent"); if (r.ok) { if (r.form) loadForm(r.form, r.note); } else status(r.note); });
+    $("btnFile").addEventListener("click", () => { $("fileIn").value = ""; $("fileIn").click(); });
+    $("fileIn").addEventListener("change", async () => {
+      const f = $("fileIn").files[0];
+      if (!f) return;
+      if (f.size > 2000000) { status(f.name + " is too big to be a prompt."); return; }
+      const r = await api("prompts_import", { filename: f.name, text: await f.text() });
+      if (r.ok) { $("promptName").value = f.name.replace(/\.[^.]+$/, ""); loadForm(r.form, r.note); } else status(r.note);
+    });
     $("modes").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (b) { S.form.mode = b.dataset.mode; changed(); refreshPreview(); } });
     $("chips").addEventListener("click", (e) => { const b = e.target.closest("[data-insert]"); if (b) insertInto(S.lastBox, b.dataset.insert, false); });
     document.querySelectorAll("[data-snip]").forEach((b) => b.addEventListener("click", () => snippet(b.dataset.snip)));
@@ -750,6 +917,7 @@
   async function start() {
     theme();
     wire();
+    hlInit();
     fullscreen();
     await loadSession(true);
     const draft = await api("draft").catch(() => ({ ok: false }));

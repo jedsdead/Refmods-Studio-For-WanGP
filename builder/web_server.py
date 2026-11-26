@@ -49,6 +49,12 @@ def create_app(plugin, host):
                          "framings": list(core.FRAMINGS), "rigs": list(core.RIGS), "lenses": list(core.LENSES),
                          "cuts": list(core.CUT_VERBS), "continues": list(core.CONTINUE_VERBS),
                          "bodies": list(core.CAMERA_BODIES),
+                         "styles": list(core.STYLES), "locations": list(core.LOCATIONS), "times": list(core.TIMES_OF_DAY),
+                         "lighting": list(core.LIGHTING), "atmospheres": list(core.ATMOSPHERES),
+                         "grades": list(core.GRADES), "soundscapes": list(core.SOUNDSCAPES),
+                         "instruments": list(core.INSTRUMENTS), "tempos": list(core.TEMPOS),
+                         "dynamics": list(core.DYNAMICS), "text_kinds": list(core.SCREEN_TEXT_KINDS),
+                         "carries": list(core.CARRY_PHRASES),
                          "max_looks": core.MAX_LOOKS}
         return snap
 
@@ -78,6 +84,26 @@ def create_app(plugin, host):
     @app.get("/api/prompts")
     def prompts():
         return {"names": service.prompt_names()}
+
+    @app.get("/api/library")
+    def library():
+        return service.library()
+
+    @app.post("/api/library/meta")
+    def library_meta(payload: dict = Body(...)):
+        return service.library_meta(payload.get("name"), payload)
+
+    @app.post("/api/library/delete")
+    def library_delete(payload: dict = Body(...)):
+        return service.delete_prompt(payload.get("name"))
+
+    @app.get("/api/prompts_recent")
+    def load_recent():
+        return service.load_recent()
+
+    @app.post("/api/prompts_import")
+    def import_prompt(payload: dict = Body(...)):
+        return service.import_file(str(payload.get("filename") or "the file"), str(payload.get("text") or "")[:2_000_000])
 
     @app.get("/api/prompts/{name}")
     def load_prompt(name: str):
