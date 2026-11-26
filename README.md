@@ -1,7 +1,9 @@
 # Refmods Studio
 
 Refmods and the MiniMax H3 Prompt Builder in one WanGP plugin, on one **Refmods Studio** tab with a subtab for each.
-The button at the right of either page's header opens it full screen; Esc goes back.
+The button at the right of each page's header opens it full screen; Esc goes back.
+
+![The Prompt Builder](docs/images/prompt-builder.png)
 
 - **Refmods**: no-training reference mods for MiniMax H3 (Ref2VA, FL2VA, FL2VA ControlNet, H3-Image, P-H3-Image)
   and Flux 2 / Flux 3. Compress a reference into a small `.safetensors` file once, then reuse it at any strength
@@ -11,8 +13,10 @@ The button at the right of either page's header opens it full screen; Esc goes b
   Deepy tools for H3 prompts.
 
 The Refmods half started as Refmods For Wan GP `0.38.1-fork.58`; its guide, for how mods work, is in [`docs/refmods.md`](docs/refmods.md).
-The Prompt Builder was reworked in 0.2 (below). The 4.x builder's guide is kept in
+The Prompt Builder replaces the MiniMax H3 Prompt Builder 4.x. That plugin's guide is kept in
 [`docs/prompt-builder.md`](docs/prompt-builder.md) for the parts that still apply: the enhancer and the Deepy tools.
+
+The screenshots use made-up mods and placeholder pictures.
 
 ## The Prompt Builder
 
@@ -58,13 +62,15 @@ A pack is a set of mods, each with a role: identity, clothing, reference sheet, 
 or voice. Packs can mix anything. In the **Refmods: MiniMax H3** panel, pick a pack and **Add pack** to put its mods
 into the rows, or **Replace all** to start from it. Mods switched off in the pack are left out unless **Include
 switched-off mods** is ticked. Type a name and **Save as pack** to keep the rows. In the Prompt
-Builder, **Draft subjects** turns a character pack into one subject, each mod providing what its role says. Your old
+Builder, **Draft from what's sent** turns a character pack into one subject, each mod providing what its role says. Your old
 presets are listed as packs.
 
 A pack can also hold a character: the fields of the Prompt Builder's character creator. In the Prompt Builder, pick a
 pack and **Load pack**: the Refmods panel arms its mods (with their strengths and labels) and the builder fills in the
 subject, with each mod as a look source or the voice. **Save as pack** does the reverse: it saves the selected
 subject's character, its mods and what each provides. The **Packs** page can edit the character too.
+
+![The Packs page](docs/images/packs.png)
 
 ## The Refmods subtab
 
@@ -79,11 +85,19 @@ creating, decoding, strength previews, encoder frames and soundtracks.
   - What needs the model runs as a short task: **Decompile**, **Strength preview** (the first picture at a few
     strengths), **Decode to listen**, encoder frames, soundtracks, **Clean audio** and **Convert to Flux**.
   - **Replace preview** sets the picture shown for a mod. The mod itself doesn't change.
+  - Flux mods store a small preview of each source picture. Older ones show a rough preview worked out from the
+    mod itself until you replace it.
   - Ctrl-click or tick several to move, add to a pack, update or delete them together, or drag them onto a folder.
+
+  ![The Library](docs/images/library.png)
+
 - **Create** makes mods for MiniMax H3 or Flux. Drop pictures, videos or an audio file, drag them into order, crop
   pictures and videos (with rotate and mirror), crop a picture to its subject or blur its background, and scrub through videos and audio to set in and out points; **Use frame** and **Use audio** add a still or the kept sound as a new source. Make one mod from all of them or one per picture or video, at **Full** (exact, best
   for faces) or **Compressed** (smaller). The estimate shows the tokens and file size, and **Create** stays locked
   until the mod can be made. Every option from the old Extract tabs is under **Advanced**.
+
+  ![The Create page](docs/images/create.png)
+
 - **Packs** edits packs: their mods, each one's role, strength (up to 2), how it's sent, its sound, and an **On**
   switch that keeps a mod in the pack but leaves it out when the pack is added.
 - **Setup** checks that Refmods is hooked into the chosen model, shows the mods Showrunner, Deepy and API tasks

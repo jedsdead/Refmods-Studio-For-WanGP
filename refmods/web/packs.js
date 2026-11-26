@@ -75,7 +75,7 @@
         <label class="fld">Kind<select id="pKind">${S.kinds.map((k) => `<option value="${esc(k)}"${k === (p.kind || "mixed") ? " selected" : ""}>${esc(k)}</option>`).join("")}</select></label></div>
       <div class="grid2"><label class="fld">Subject name in the Prompt Builder<input id="pSubject" value="${esc(p.subject_name || "")}" placeholder="${esc(p.name || "the pack's name")}"></label>
         <label class="fld">Description<input id="pDesc" value="${esc(p.description || "")}"></label></div>
-      <p class="explain">In the Refmods panel, <b>Add pack</b> loads the mods that are on, with these settings. In the Prompt Builder, <b>Draft subjects</b> turns a character pack into one subject, each mod providing what its role says. A mixed pack is just a set of mods.</p>
+      <p class="explain">In the Refmods panel, <b>Add pack</b> loads the mods that are on, with these settings. In the Prompt Builder, <b>Load pack</b> turns a character pack into one subject, each mod providing what its role says. A mixed pack is just a set of mods.</p>
       <details class="sec" id="pChar"${charOpen ? " open" : ""}><summary>Character <span class="hint">${p.subject && Object.keys(p.subject).length ? "filled in" : "for the Prompt Builder's Load pack"}</span></summary><div class="secbody">
         <p class="explain">What <b>Load pack</b> in the Prompt Builder fills in. Save a subject there as a pack to fill this from the character creator.</p>
         <div class="grid3">${CHARACTER.map(([k, label]) => k === "gender"

@@ -531,6 +531,7 @@ def describe(subject: dict) -> str:
             after.append(f"{height} tall")
     # Age: 34 -> "34-year-old"; a decade -> "in her early 30s"; a word ("elderly") -> an adjective.
     if age:
+        age = re.sub(r"^in (her|his|their) ", "", age, flags=re.I)   # typed in full: "in her 40s"
         if age.isdigit():
             before.append(f"{age}-year-old")
         elif DECADE_AGE.search(age) or re.match(r"(early|mid|late)[ -]", age, re.I):
