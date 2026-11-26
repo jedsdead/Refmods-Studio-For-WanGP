@@ -8,6 +8,7 @@ pipeline uses internally (see models/minimax_h3/pipeline.py's ``_pil_to_video``
 from __future__ import annotations
 
 import json
+import time
 import os
 from typing import List, Optional, Tuple
 
@@ -100,6 +101,129 @@ def write_presets(data: dict) -> str:
         json.dump(data, handle, indent=2)
     os.replace(tmp, path)        # a crash mid-write cannot cost the other presets
     return path
+
+
+# -- packs (Refmods Studio) --------------------------------------------------
+#
+# A pack is a named set of mods, each with the role it plays (face, costume
+# sheet, voice...) and the panel settings it was armed with. One file per pack
+# in loras/refmods_plugin/packs/, so a pack can be copied to someone else.
+# Presets (presets.json) were packs without roles; they are imported once and
+# presets.json is left where it is.
+
+PACK_ROLES = ("identity", "clothing", "reference sheet", "pose_motion", "background", "style", "voice", "generic")
+PACK_KINDS = ("character", "location", "prop", "style", "mixed")
+
+
+def packs_dir() -> str:
+    d = os.path.join(os.path.dirname(refmods_dir()), "packs")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _pack_file(name: str) -> str:
+    safe = "".join(c for c in str(name or "") if c.isalnum() or c in " -_.,()").strip(" .")
+    while ".." in safe:
+        safe = safe.replace("..", ".")
+    if not safe:
+        raise ValueError("a pack needs a name")
+    return os.path.join(packs_dir(), safe[:80] + ".json")
+
+
+def list_packs() -> list:
+    """Pack names, as saved."""
+    import_presets_as_packs()
+    names = []
+    for entry in sorted(os.listdir(packs_dir()), key=str.lower):
+        if entry.endswith(".json"):
+            pack = read_pack_file(os.path.join(packs_dir(), entry))
+            if pack:
+                names.append(pack["name"])
+    return names
+
+
+def read_pack_file(path: str):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except Exception:
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("members"), list):
+        return None
+    data.setdefault("name", os.path.splitext(os.path.basename(path))[0])
+    data.setdefault("kind", "mixed")
+    return data
+
+
+def read_pack(name: str):
+    try:
+        return read_pack_file(_pack_file(name))
+    except ValueError:
+        return None
+
+
+def mod_concept(name: str) -> str:
+    """The concept type stored in a mod, as a pack role."""
+    try:
+        meta = read_refmod_meta(mod_path(name)) or {}
+    except Exception:
+        meta = {}
+    concept = str(meta.get("concept_type") or "generic")
+    if meta.get("kind") == "audio":
+        return "voice"
+    return concept if concept in PACK_ROLES else "generic"
+
+
+def write_pack(pack: dict) -> str:
+    pack = dict(pack)
+    pack["format"] = 1
+    pack["saved"] = time.strftime("%Y-%m-%d %H:%M")
+    for member in pack.get("members") or []:
+        if not member.get("role"):
+            member["role"] = mod_concept(member.get("mod"))
+    path = _pack_file(pack.get("name"))
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as handle:
+        json.dump(pack, handle, indent=2)
+    os.replace(tmp, path)
+    return path
+
+
+def delete_pack(name: str) -> bool:
+    try:
+        os.remove(_pack_file(name))
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def import_presets_as_packs() -> int:
+    """Each saved preset becomes a "mixed" pack, once. Returns how many."""
+    marker = os.path.join(packs_dir(), ".presets_imported")
+    if os.path.exists(marker):
+        return 0
+    count = 0
+    for name, preset in read_presets().items():
+        try:
+            if os.path.exists(_pack_file(name)):
+                continue
+            settings = {k: v for k, v in preset.items() if k not in ("rows", "saved")}
+            pack = {"name": name, "kind": "mixed", "from_preset": True,
+                    "members": [dict(row) for row in preset.get("rows") or []]}
+            if settings:
+                pack["settings"] = settings
+            write_pack(pack)
+            count += 1
+        except Exception as e:
+            print(f"[Refmods] could not turn preset '{name}' into a pack ({e!r})")
+    try:
+        with open(marker, "w", encoding="utf-8") as handle:
+            handle.write(time.strftime("%Y-%m-%d %H:%M"))
+    except OSError:
+        pass
+    if count:
+        print(f"[Refmods] {count} preset(s) are now packs; presets.json is kept as it was")
+    return count
 
 
 def mod_path(name: str) -> str:

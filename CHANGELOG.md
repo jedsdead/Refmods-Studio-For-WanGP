@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0] — 2026-11-26
+
+- **Packs.** A pack is a set of mods, each with its role (identity, clothing, reference sheet, pose and motion,
+  background, style, voice). The inline panel has a pack row at the top: **Add pack** puts a pack's mods into the
+  rows beside what's armed, **Replace all** clears the rows first, **Save as pack** saves the armed rows, and
+  **Delete pack** removes one. Packs can be mixed. Mods missing from the folder are skipped and named.
+- Presets are now packs. Each saved preset is turned into a pack once; `presets.json` is left where it is.
+- The inline panel is compact: one line per mod under a heading row (Mod, Strength, Label, Send as, Sound,
+  Soundtrack), still in separate Image, Video and Audio sections. Strength is a number box from 0 to 2.
+- The Prompt Builder knows which pack each armed mod came from. **Draft subjects** turns a character pack into one
+  subject, with each mod providing what its role says (a face, a costume from a reference sheet, the movement) and
+  the pack's voice as the subject's voice. Background and style mods become a location or style subject.
+- "voice" is a new concept type, for audio mods and soundtracks.
+
 ## [0.3.1] — 2026-11-26
 
 - The live preview scrolls inside its own box, and the checks sit under it instead of being drawn over it in a

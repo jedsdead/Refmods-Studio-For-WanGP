@@ -58,6 +58,7 @@ CONCEPT_TYPES = (
     "clothing",      # an outfit / garment, decoupled from who's wearing it
     "background",    # environment / set / location plate
     "style",         # look/grade/animation style, not a concrete subject
+    "voice",         # Refmods Studio: a voice, for audio mods and soundtracks
 )
 
 # "concept_type" is documentation + a routing hint, NOT a hard constraint on

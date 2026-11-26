@@ -129,6 +129,11 @@ class Media:
     sheet: bool = False
     description: str = ""
     labels: list = field(default_factory=list)
+    concept: str = ""          # the mod's concept type
+    pack: str = ""             # the armed pack it came from, if any
+    pack_kind: str = ""
+    pack_subject: str = ""
+    pack_role: str = ""        # its role in that pack (identity, clothing, voice...)
 
     @property
     def label_text(self) -> str:
@@ -239,7 +244,10 @@ def detect_media(inputs: dict, model: dict, mods: list) -> list[Media]:
     for mod in mods or []:
         out.append(Media(str(mod.get("key")), str(mod.get("kind") or "picture"), "mod", "mod",
                          str(mod.get("name") or ""), max(1, int(mod.get("count") or 1)),
-                         mod.get("label") or None, bool(mod.get("sheet")), str(mod.get("description") or "")))
+                         mod.get("label") or None, bool(mod.get("sheet")), str(mod.get("description") or ""),
+                         concept=str(mod.get("concept") or ""), pack=str(mod.get("pack") or ""),
+                         pack_kind=str(mod.get("pack_kind") or ""), pack_subject=str(mod.get("pack_subject") or ""),
+                         pack_role=str(mod.get("role") or "")))
     assign_labels(out)
     return out
 
@@ -902,3 +910,69 @@ def form_from_v4(d: dict) -> dict:
         subject["accent"] = _s(entry.get("accent"))
         form["subjects"].append(subject)
     return form
+
+
+# -- packs and roles into subjects ------------------------------------------------
+
+ROLE_PARTS = {"identity": ["face", "hair", "skin", "body type"], "clothing": ["clothing"],
+              "reference sheet": ["clothing"], "pose_motion": ["movement"],
+              "generic": ["face", "hair", "skin", "body type"]}
+ROLE_KINDS = {"background": "Location", "style": "Style"}
+
+
+def _short(name: str) -> str:
+    return name.rsplit("/", 1)[-1].rsplit(".", 1)[0].replace("_", " ")
+
+
+def subjects_from_media(media: list, existing: list) -> list:
+    """New subjects for what's sent and not used by a subject yet.
+
+    An armed character pack becomes one subject: each member a look source
+    providing what its role says (a face, a costume sheet, the movement), and
+    its voice the subject's voice. A location, prop or style pack becomes one
+    subject of that kind. Anything else, mixed packs included, gets a subject
+    per picture or video, with a mod's own soundtrack as its voice."""
+    used = {l["key"] for s in existing for l in clean_subject(s)["look"]} | {s.get("voice") for s in existing}
+    fresh = [m for m in media if m.key not in used and m.labels and m.role not in ("start", "continue", "end")]
+    out, done = [], set()
+    packs = {}
+    for m in fresh:
+        if m.pack and m.pack_kind in ("character", "location", "prop", "style"):
+            packs.setdefault(m.pack, []).append(m)
+    for name, members in packs.items():
+        kind = members[0].pack_kind
+        subject = new_subject({"character": "Character", "location": "Location", "prop": "Prop",
+                               "style": "Style"}[kind])
+        subject["name"] = members[0].pack_subject or name
+        for m in members:
+            done.add(m.key)
+            if m.kind == "audio":
+                if kind == "character" and not subject["voice"]:
+                    subject["voice"] = m.key
+                continue
+            role = m.pack_role or m.concept or "generic"
+            if kind == "character" and role in ROLE_KINDS:
+                extra = new_subject(ROLE_KINDS[role])
+                extra["name"] = _short(m.name)
+                extra["look"] = [{"key": m.key, "parts": list(DEFAULT_PARTS), "sheet": False}]
+                out.append(extra)
+                continue
+            parts = ROLE_PARTS.get(role, list(DEFAULT_PARTS)) if kind == "character" else list(DEFAULT_PARTS)
+            subject["look"].append({"key": m.key, "parts": list(parts),
+                                    "sheet": role == "reference sheet" or m.sheet})
+        subject["look"] = subject["look"][:MAX_LOOKS]
+        out.insert(0, subject)
+    for m in fresh:
+        if m.key in done or m.kind not in ("picture", "video"):
+            continue
+        role = m.pack_role or m.concept or "generic"
+        subject = new_subject(ROLE_KINDS.get(role, "Character"))
+        subject["name"] = _short(m.name)
+        parts = ROLE_PARTS.get(role, list(DEFAULT_PARTS))
+        subject["look"] = [{"key": m.key, "parts": list(parts), "sheet": role == "reference sheet" or m.sheet}]
+        voice = next((a for a in fresh if a.kind == "audio" and a.key == f"{m.key}:audio"), None)
+        if voice and subject["kind"] == "Character":
+            subject["voice"] = voice.key
+            done.add(voice.key)
+        out.append(subject)
+    return out

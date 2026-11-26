@@ -164,6 +164,14 @@ def _folder_choices():
     return [ALL_FOLDERS_CHOICE, ROOT_FOLDER_CHOICE] + storage.list_mod_folders()
 
 
+ARMED_PACKS_KEY = "_refmods_packs"   # session state: the packs armed in the panel, for the builder
+
+
+def _armed_packs(state) -> list:
+    packs = (state or {}).get(ARMED_PACKS_KEY) if isinstance(state, dict) else None
+    return [dict(p) for p in packs if isinstance(p, dict)] if isinstance(packs, list) else []
+
+
 def _armed_row_indexes(row_vals, n_rows) -> list:
     """Which picker rows are armed, in order -- the same rule _rows_payload
     uses, so a row lines up with its entry in the payload (fork.48)."""
@@ -549,6 +557,25 @@ def _label_number(value):
 
 # fork.38: how a multi-picture image row is sent (was the "Send as one video" box).
 SEND_AS_UI = [("Separate pictures", "pictures"), ("One video", "video"), ("Contact sheet", "sheet")]
+SEND_AS_SHORT = [("pictures", "pictures"), ("one video", "video"), ("contact sheet", "sheet")]
+
+# Refmods Studio: the compact panel's columns (heading, scale, min width).
+ROW_COLUMNS = (("Mod", 4, 160), ("Strength", 1, 76), ("Label", 1, 110), ("Send as", 1, 130),
+               ("Sound", 1, 74), ("Soundtrack", 1, 120))
+
+PANEL_CSS = """<style>
+.rs-panel .rs-row { gap: 6px !important; align-items: center; flex-wrap: nowrap !important; }
+.rs-panel .rs-row > div { min-width: 0 !important; }
+.rs-panel .rs-row .block, .rs-panel .rs-row .form { padding: 0 !important; border: 0 !important;
+  background: transparent !important; box-shadow: none !important; }
+.rs-panel .rs-row input[type=number] { padding: 4px 6px !important; }
+.rs-panel .rs-head { margin-bottom: -4px; }
+.rs-panel .rs-heading { font-size: 11px; opacity: .75; }
+.rs-panel .rs-packrow { gap: 6px !important; align-items: center; flex-wrap: wrap; }
+.rs-panel input[type=number] { border: 1px solid var(--border-color-primary) !important;
+    border-radius: var(--radius-sm); padding: 4px 6px !important; max-width: 76px; }
+.rs-panel .rs-packrow > button { flex: none !important; min-width: max-content !important; }
+</style>"""
 
 
 def _send_as(value) -> str:
@@ -730,6 +757,13 @@ def builder_mod_entries(state):
         payload = json.loads((state or {}).get(STASH_KEY) or "{}")
     except Exception:
         return []
+    # Refmods Studio: which armed pack each mod came from, and its role there.
+    in_pack = {}
+    for pack in _armed_packs(state):
+        for member in pack.get("members") or []:
+            in_pack.setdefault(member.get("mod"), {"pack": pack.get("name"), "pack_kind": pack.get("kind"),
+                                                   "pack_subject": pack.get("subject") or pack.get("name"),
+                                                   "role": member.get("role") or "generic"})
     out = []
     for row in payload.get("rows") or []:
         name = row.get("mod")
@@ -741,7 +775,8 @@ def builder_mod_entries(state):
         send_as = row.get("send_as") or ("video" if row.get("as_video") else "pictures")
         label = row.get("label")
         entry = {"key": f"mod:{name}", "name": name, "label": label,
-                 "description": str(meta.get("description") or "")}
+                 "description": str(meta.get("description") or ""),
+                 "concept": str(meta.get("concept_type") or "generic"), **in_pack.get(name, {})}
         if _is_picture_mod(meta):
             if send_as == "video" and latent_t > 1:
                 out.append(dict(entry, kind="video", count=1))
@@ -755,8 +790,11 @@ def builder_mod_entries(state):
             out.append(dict(entry, kind="audio", count=1))
             continue
         if meta.get("has_audio") and row.get("use_audio", True):
-            out.append({"key": f"mod:{name}:audio", "name": f"{name} (soundtrack)", "kind": "audio",
-                        "count": 1, "label": row.get("audio_label"), "description": ""})
+            soundtrack = {"key": f"mod:{name}:audio", "name": f"{name} (soundtrack)", "kind": "audio",
+                          "count": 1, "label": row.get("audio_label"), "description": "", "concept": "voice"}
+            if name in in_pack:
+                soundtrack.update(in_pack[name], role="voice")
+            out.append(soundtrack)
     return out
 
 
@@ -1279,24 +1317,28 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
         # panel out of sight for anyone who already has a MiniMax H3 Ref2VA model
         # selected by default and hasn't touched the model dropdown yet. The .change()
         # handler below still correctly hides it the moment any model switch happens.
-        with gr.Accordion("Refmods: MiniMax H3", open=False) as accordion:
+        with gr.Accordion("Refmods: MiniMax H3", open=False, elem_classes="rs-panel") as accordion:
+            gr.HTML(PANEL_CSS)
             gr.Markdown(
                 "Works with **MiniMax H3 Ref2VA, FL2VA and FL2VA ControlNet**. Make mods in the **Refmods** tab.")
+            # Refmods Studio: packs, above the rows they fill. Presets became packs.
+            with gr.Row(elem_classes="rs-packrow"):
+                pack_box = gr.Dropdown(
+                    choices=storage.list_packs(), value=None, allow_custom_value=True, show_label=False,
+                    container=False, scale=3, min_width=200, label="Pack",
+                    elem_classes="rs-packbox")
+                pack_add = gr.Button("Add pack", size="sm", variant="primary", scale=0)
+                pack_replace = gr.Button("Replace all", size="sm", scale=0)
+                pack_save = gr.Button("Save as pack", size="sm", scale=0)
+                pack_delete = gr.Button("Delete pack", size="sm", scale=0)
+            gr.Markdown("*Packs are sets of mods, each with its role. Pick one and **Add pack** puts it into "
+                        "the rows below, beside what's there; **Replace all** clears the rows first. To save "
+                        "the rows as a pack, type a name in the box. Your presets are listed as packs.*")
             # Fork: the full panel (per-row options, sizing, text encoder).
             mod_rows, panel_controls = self._build_mod_picker_rows_full()
             with gr.Row():
                 status = gr.Markdown("*No RefMods selected.*")
                 clear_btn = gr.Button("Clear RefMods", size="sm", scale=0)
-            # fork.58: presets. One box does both jobs: pick a saved name to
-            # load or delete it, or type a new one to save under.
-            with gr.Row():
-                preset_box = gr.Dropdown(
-                    choices=sorted(storage.read_presets(), key=str.lower), value=None,
-                    allow_custom_value=True, label="Preset", scale=3,
-                    info="Type a name and Save, or pick one to Load or Delete.")
-                preset_save = gr.Button("Save", size="sm", scale=0)
-                preset_load = gr.Button("Load", size="sm", scale=0)
-                preset_delete = gr.Button("Delete", size="sm", scale=0)
             saved_arm = storage.read_auto_arm() or {}   # fork.47
             share = gr.Checkbox(
                 bool(saved_arm.get("on")),
@@ -1338,10 +1380,16 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
             if rows:
                 state[STASH_KEY] = json.dumps(payload)
                 msg = f"✅ {len(rows)} RefMod(s) armed for the next MiniMax H3 generation from this page."
+                armed_mods = {row["mod"] for row in rows}
+                packs = [p for p in _armed_packs(state) if any(m.get("mod") in armed_mods for m in p.get("members") or [])]
+                state[ARMED_PACKS_KEY] = packs
+                if packs:
+                    msg += " Packs: " + ", ".join(p["name"] for p in packs) + "."
                 if shared:
                     msg += " Showrunner, Deepy and API tasks use them too."
             else:
                 state.pop(STASH_KEY, None)
+                state.pop(ARMED_PACKS_KEY, None)
                 msg = "*No RefMods selected.*"
             return [state, msg] + boxes
 
@@ -1350,6 +1398,7 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
             # that aren't armed.
             if isinstance(state, dict):
                 state.pop(STASH_KEY, None)
+                state.pop(ARMED_PACKS_KEY, None)
             resets = []
             for _ in mod_rows:
                 resets += _cleared_row_updates()
@@ -1358,46 +1407,44 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
         clear_btn.click(fn=clear_selection, inputs=[self.state],
                         outputs=[self.state, status] + [c for row in mod_rows for c in row], queue=False)
 
-        # fork.58: presets -- the armed mods, in order, with each row's
-        # settings. The panel-wide options are not part of a preset.
+        # Refmods Studio: packs (presets were packs without roles). A pack holds
+        # the armed rows, in order, with each row's settings and its role; the
+        # panel-wide options only when the pack was saved with them.
         n_row_widgets = (IMAGE_ROWS + VIDEO_ROWS + AUDIO_ROWS) * ROW_WIDTH
         row_widgets = widgets[:n_row_widgets]
 
-        def preset_choices(value=None):
-            return gr.update(choices=sorted(storage.read_presets(), key=str.lower), value=value)
+        def pack_choices(value=None):
+            return gr.update(choices=storage.list_packs(), value=value)
 
-        def save_preset(name, *row_vals):
+        def save_pack(name, *row_vals):
             name = str(name or "").strip()
             if not name:
-                return "Type a name for the preset first.", gr.update()
+                return "Type a name for the pack first.", gr.update()
             rows = _rows_payload(row_vals)
             if not rows:
                 return "Nothing is armed, so there is nothing to save.", gr.update()
-            presets = storage.read_presets()
-            existed = name in presets
-            presets[name] = {"rows": rows, "saved": time.strftime("%Y-%m-%d %H:%M")}
+            old = storage.read_pack(name) or {}
+            roles = {m.get("mod"): m.get("role") for m in old.get("members") or []}
+            members = [dict(row, role=roles.get(row["mod"]) or storage.mod_concept(row["mod"])) for row in rows]
+            pack = {**old, "name": name, "kind": old.get("kind") or "mixed", "members": members}
+            pack.pop("from_preset", None)
             try:
-                storage.write_presets(presets)
+                storage.write_pack(pack)
             except Exception as e:
-                return f"⚠️ Could not save the preset ({e}).", gr.update()
-            return (f"💾 Preset '{name}' {'updated' if existed else 'saved'}: {len(rows)} RefMod(s).",
-                    preset_choices(name))
+                return f"⚠️ Could not save the pack ({e}).", gr.update()
+            return (f"💾 Pack '{name}' {'updated' if old else 'saved'}: {len(rows)} RefMod(s).",
+                    pack_choices(name))
 
-        def delete_preset(name):
+        def delete_pack(name):
             name = str(name or "").strip()
-            presets = storage.read_presets()
-            if name not in presets:
-                return "Pick a saved preset to delete.", preset_choices()
-            del presets[name]
-            try:
-                storage.write_presets(presets)
-            except Exception as e:
-                return f"⚠️ Could not delete the preset ({e}).", gr.update()
-            return f"🗑️ Preset '{name}' deleted.", preset_choices(None)
+            if not storage.read_pack(name):
+                return "Pick a saved pack to delete.", pack_choices()
+            if not storage.delete_pack(name):
+                return f"⚠️ Could not delete the pack '{name}'.", gr.update()
+            return f"🗑️ Pack '{name}' deleted.", pack_choices(None)
 
-        preset_save.click(fn=save_preset, inputs=[preset_box] + row_widgets,
-                          outputs=[status, preset_box], queue=False)
-        preset_delete.click(fn=delete_preset, inputs=[preset_box], outputs=[status, preset_box], queue=False)
+        pack_save.click(fn=save_pack, inputs=[pack_box] + row_widgets, outputs=[status, pack_box], queue=False)
+        pack_delete.click(fn=delete_pack, inputs=[pack_box], outputs=[status, pack_box], queue=False)
 
         # fork.34: loading a file's settings refills the panel (outputinfo).
         parts = getattr(self, "_panel_parts", None)
@@ -1423,18 +1470,45 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
                             + [ui for k in kinds for ui in parts["kind_ui"][k]]
                             + [parts["shown"][k] for k in kinds])
 
-            def load_preset(name):
+            def load_pack(state, name, replace, *row_vals):
                 name = str(name or "").strip()
-                preset = storage.read_presets().get(name)
-                if not preset:
-                    return ["Pick a saved preset to load."] + [gr.update()] * (len(load_outputs) - 1)
-                return _panel_restore_updates(json.dumps({"rows": preset.get("rows") or []}),
-                                              keep_controls=True, source=f"preset '{name}'")
+                pack = storage.read_pack(name)
+                if not pack:
+                    return [state, "Pick a saved pack first."] + [gr.update()] * (len(load_outputs) - 1)
+                members = [dict(m) for m in pack.get("members") or [] if m.get("mod")]
+                missing = [m["mod"] for m in members if not os.path.isfile(storage.mod_path(m["mod"]) + ".safetensors")]
+                members = [m for m in members if m["mod"] not in missing]
+                if not members:
+                    return [state, f"⚠️ None of the pack's mods are in your mods folder ({', '.join(missing)})."] + \
+                        [gr.update()] * (len(load_outputs) - 1)
+                current = [] if replace else _rows_payload(row_vals)
+                have = {row["mod"] for row in current}
+                rows = current + [m for m in members if m["mod"] not in have]
+                payload = {"rows": rows}
+                settings = pack.get("settings") if replace else None
+                if isinstance(settings, dict):
+                    payload.update(settings)
+                if isinstance(state, dict):
+                    armed = [] if replace else [p for p in _armed_packs(state) if p.get("name") != name]
+                    armed.append({"name": name, "kind": pack.get("kind", "mixed"),
+                                  "subject": pack.get("subject_name") or "",
+                                  "members": [{"mod": m["mod"], "role": m.get("role") or storage.mod_concept(m["mod"])}
+                                              for m in members]})
+                    state[ARMED_PACKS_KEY] = armed
+                verb = "replaced the rows with" if replace else "added"
+                source = f"pack '{name}' ({verb})" + (f"; not found, skipped: {', '.join(missing)}" if missing else "")
+                return [state] + _panel_restore_updates(json.dumps(payload), keep_controls=not isinstance(settings, dict),
+                                                        source=source)
 
-            preset_load.click(fn=load_preset, inputs=[preset_box], outputs=load_outputs, queue=False)
+            pack_add.click(fn=lambda st, n, *v: load_pack(st, n, False, *v), inputs=[self.state, pack_box] + row_widgets,
+                           outputs=[self.state] + load_outputs, queue=False)
+            pack_replace.click(fn=lambda st, n, *v: load_pack(st, n, True, *v),
+                               inputs=[self.state, pack_box] + row_widgets,
+                               outputs=[self.state] + load_outputs, queue=False)
         else:
-            preset_load.click(fn=lambda: "Loading presets needs a newer Wan2GP panel layout.",
-                              inputs=[], outputs=[status], queue=False)
+            for button in (pack_add, pack_replace):
+                button.click(fn=lambda: "Loading packs needs a newer Wan2GP panel layout.",
+                             inputs=[], outputs=[status], queue=False)
 
         # One handler for every widget (gr.on), not one per widget: each takes
         # every widget as input, and Gradio's first page load does work for
@@ -1644,20 +1718,39 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
             gr.Markdown(f"**{label}**" + (" -- a start image, Continue Video or your own references "
                                            "take the first label numbers." if kind == "image" else ""))
             kind_rows, kind_ui = [], []
+            # Refmods Studio: one compact line per mod, under column headings.
+            # Each control sits in a fixed column so a hidden one (Send as on a
+            # single picture, Sound on a mod without one) keeps its space and
+            # the columns stay lined up.
+            columns = [c for c in ROW_COLUMNS if kind != "audio" or c[0] in ("Mod", "Strength", "Label")]
+            with gr.Row(elem_classes="rs-row rs-head"):
+                for heading, scale, width in columns:
+                    with gr.Column(scale=scale, min_width=width):
+                        gr.HTML(f"<span class='rs-heading'>{heading}</span>")
             for i in range(count):
-                with gr.Row(visible=i == 0) as row_ui:
-                    mdd = gr.Dropdown(choices=_mod_choices(kind), value=NONE_CHOICE,
-                                      label=f"{kind.capitalize()} mod {i + 1}", scale=4)
-                    strength = gr.Slider(0.0, 2.0, value=1.0, step=0.01, label="Strength",
-                                         scale=3, min_width=200)
-                    # fork.27: the prompt label this mod gets (Auto = next free).
-                    label_dd = gr.Dropdown(choices=_label_choices(kind), value=AUTO_LABEL,
-                                           label="Label", visible=False, scale=2, min_width=130)
-                    with gr.Column(scale=2, min_width=150):
-                        as_video = gr.Dropdown(choices=SEND_AS_UI, value="pictures", label="Send as",
+                with gr.Row(visible=i == 0, elem_classes="rs-row") as row_ui:
+                    with gr.Column(scale=ROW_COLUMNS[0][1], min_width=ROW_COLUMNS[0][2]):
+                        mdd = gr.Dropdown(choices=_mod_choices(kind), value=NONE_CHOICE, show_label=False,
+                                          container=False, label=f"{kind.capitalize()} mod {i + 1}")
+                    with gr.Column(scale=ROW_COLUMNS[1][1], min_width=ROW_COLUMNS[1][2]):
+                        strength = gr.Number(value=1.0, minimum=0.0, maximum=2.0, step=0.05, show_label=False,
+                                             container=False, label="Strength")
+                    with gr.Column(scale=ROW_COLUMNS[2][1], min_width=ROW_COLUMNS[2][2]):
+                        # fork.27: the prompt label this mod gets (Auto = next free).
+                        label_dd = gr.Dropdown(choices=_label_choices(kind), value=AUTO_LABEL, show_label=False,
+                                               container=False, label="Label", visible=False)
+                    with gr.Column(scale=ROW_COLUMNS[3][1], min_width=ROW_COLUMNS[3][2],
+                                   visible=kind != "audio"):
+                        as_video = gr.Dropdown(choices=SEND_AS_SHORT, value="pictures", show_label=False,
+                                               container=False, label="Send as",
                                                visible=False)   # fork.38 (was a checkbox)
-                        use_audio = gr.Checkbox(True, label="Include audio", visible=False)
+                    with gr.Column(scale=ROW_COLUMNS[4][1], min_width=ROW_COLUMNS[4][2],
+                                   visible=kind != "audio"):
+                        use_audio = gr.Checkbox(True, label="use", container=False, visible=False)
+                    with gr.Column(scale=ROW_COLUMNS[5][1], min_width=ROW_COLUMNS[5][2],
+                                   visible=kind != "audio"):
                         audio_label_dd = gr.Dropdown(choices=_label_choices("audio"), value=AUTO_LABEL,
+                                                     show_label=False, container=False,
                                                      label="Soundtrack label", visible=False)
                 kind_rows.append((mdd, strength, as_video, use_audio, label_dd, audio_label_dd))
                 kind_ui.append(row_ui)

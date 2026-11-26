@@ -269,24 +269,14 @@ class Service:
         return ""
 
     def draft_subjects(self, form):
-        """One subject for each picture, video or mod that no subject uses yet, voices joined to the mod they
-        came with."""
+        """Subjects for what's sent and not used yet: an armed pack becomes one subject with its sources
+        filled in from the members' roles; other mods get one each."""
         form = core.clean_form(form)
         media, _, _, _ = self.resolve(form)
-        used = {l["key"] for s in form["subjects"] for l in s["look"]} | {s.get("voice") for s in form["subjects"]}
-        added = 0
-        for m in media:
-            if m.key in used or m.kind not in ("picture", "video") or m.role in ("start", "continue", "end"):
-                continue
-            subject = core.new_subject()
-            subject["name"] = m.name.rsplit("/", 1)[-1].rsplit(".", 1)[0].replace("_", " ")
-            subject["look"] = [{"key": m.key, "parts": list(core.DEFAULT_PARTS), "sheet": bool(m.sheet)}]
-            voice = next((a for a in media if a.kind == "audio" and a.key == f"{m.key}:audio"), None)
-            if voice and voice.key not in used:
-                subject["voice"] = voice.key
-            form["subjects"].append(subject)
-            added += 1
-        note = f"Added {added} subject(s) from what's sent." if added else "Every picture and mod already has a subject."
+        added = core.subjects_from_media(media, form["subjects"])
+        form["subjects"] += added
+        note = (f"Added {len(added)} subject(s) from what's sent." if added
+                else "Every picture and mod already has a subject.")
         return {"form": form, "note": note}
 
     # -- the prompt enhancer, as jobs ------------------------------------------------
