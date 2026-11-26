@@ -3392,6 +3392,34 @@ def _run_decompile_job(pipeline_self, spec: dict, status) -> None:
     status(f"Decompile finished: '{name}' -> " + ", ".join(written) + f" in {out}")
 
 
+def _run_strength_preview_job(pipeline_self, spec: dict, status) -> None:
+    """Refmods Studio, Library: the mod's first picture as the model gets it at
+    a few strengths -- the same blend with a blurred copy that generation uses
+    (above 1 it extrapolates). One PNG per strength, beside the decompile."""
+    name = spec.get("name")
+    mod = storage.load_refmod(name) if name else None
+    if mod is None or mod.kind == "audio":
+        status("Strength preview: pick a picture or video mod.")
+        return
+    out = os.path.join(storage.decompile_dir(name, create=True), "strength")
+    os.makedirs(out, exist_ok=True)
+    for old in os.listdir(out):
+        if old.startswith("strength_") and old.endswith(".png"):
+            try:
+                os.remove(os.path.join(out, old))
+            except OSError:
+                pass
+    done = []
+    for strength in [float(v) for v in (spec.get("strengths") or [0.5, 1.0, 1.5])]:
+        latent = mod.weighted_latent(strength)
+        if latent is None:
+            continue
+        picture = _qwen_frames_from_cthw(_decode_cthw(pipeline_self, latent[:, :, :1])[:, :1])[0]
+        storage.save_png(picture, os.path.join(out, f"strength_{strength:.2f}.png"))
+        done.append(f"{strength:g}")
+    status(f"Strength preview finished: '{name}' at " + ", ".join(done))
+
+
 def _decode_audio_latent(pipeline_self, latent: torch.Tensor) -> torch.Tensor:
     """[1, 32, 2, T] audio latent -> [1, 2, samples] waveform (cpu)."""
     audio_vae = getattr(pipeline_self, "audio_vae", None)
@@ -3440,7 +3468,8 @@ def _run_clean_audio_job(pipeline_self, spec: dict, status) -> None:
 
 
 _EXTRA_JOBS = {"attach_audio": _run_attach_audio_job, "store_frames": _run_store_frames_job,
-               "decompile": _run_decompile_job, "clean_audio": _run_clean_audio_job}
+               "decompile": _run_decompile_job, "clean_audio": _run_clean_audio_job,
+               "strength_preview": _run_strength_preview_job}
 
 
 def _run_extract_job(pipeline_self, spec: dict, set_progress_status=None) -> None:

@@ -1217,6 +1217,13 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
         except Exception as e:
             print(f"[Refmods] could not register the metadata hook ({e!r}); outputs won't list their RefMods")
         self.add_tab(tab_id=PlugIn_Id, label=PlugIn_Tab, component_constructor=self.create_ui)
+        self._library_path = None
+        try:   # Refmods Studio: the Library as a web app, shown in the Library subtab
+            from .library_server import WEB_PATH as LIBRARY_PATH, create_app as create_library_app
+            self.register_web_app(LIBRARY_PATH, lambda: create_library_app(self, self._library_models))
+            self._library_path = LIBRARY_PATH
+        except Exception as e:
+            print(f"[Refmods] the Library web app could not start, using the old Library tabs: {e!r}")
         self.insert_after(target_component_id="loras_multipliers",
                           new_component_constructor=self._build_inline_refmods_section)
         self.insert_after(target_component_id="loras_multipliers",   # fork.31
@@ -2816,6 +2823,14 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
             queue=False,
         )
 
+    def _library_models(self):
+        """The models the Library's jobs can run on (it needs WanGP's session)."""
+        session = getattr(self, "_wangp_session", None)
+        if session is None:
+            return {"h3": [], "h3_default": None, "flux": []}
+        h3 = _model_choices(session)
+        return {"h3": h3, "h3_default": _default_model_choice(h3), "flux": flux_ui._model_choices(session)}
+
     # ── Tab assembly ────────────────────────────────────────────────────
 
     @_hidden_from_api
@@ -2844,10 +2859,17 @@ class MiniMaxH3RefModsPlugin(WAN2GPPlugin):
                     if getattr(self, "_flux_error", None):
                         gr.Markdown(f"⚠️ **Flux RefMods are off**: {self._flux_error}")
                     flux_ui.build_tab(self, api_session)
-                with gr.Tab("Library"):
-                    self._build_library_section(api_session, model_dd)
-                with gr.Tab("Decompile"):   # fork
-                    self._build_decompile_section(api_session, model_dd)
+                if getattr(self, "_library_path", None):
+                    with gr.Tab("Library"):
+                        # .wangp-addon-web-view lets WanGP's full-screen button size the frame.
+                        gr.HTML(f'<div class="wangp-addon-web-view"><iframe src="{self._library_path}/?embedded=1" '
+                                'title="Refmods Library" style="width:100%;height:calc(100vh - 230px);'
+                                'min-height:680px;border:0;border-radius:8px" allow="clipboard-write"></iframe></div>')
+                else:
+                    with gr.Tab("Library"):
+                        self._build_library_section(api_session, model_dd)
+                    with gr.Tab("Decompile"):   # fork
+                        self._build_decompile_section(api_session, model_dd)
                 with gr.Tab("Generate"):
                     self._build_generate_section(api_session, model_dd)
                 with gr.Tab("Auto-arm"):   # fork.46

@@ -32,6 +32,26 @@ any mods in the Refmods panel. The **Prompt Builder** tab reads them:
 The builder reads the Generator page each time you open its tab, so load your references and arm your mods first.
 **Check the prompt box** checks whatever is in the Generator page's prompt box.
 
+## Packs
+
+A pack is a set of mods, each with a role: identity, clothing, reference sheet, pose and motion, background, style
+or voice. Packs can mix anything. In the **Refmods: MiniMax H3** panel, pick a pack and **Add pack** to put its mods
+into the rows, or **Replace all** to start from it. Type a name and **Save as pack** to keep the rows. In the Prompt
+Builder, **Draft subjects** turns a character pack into one subject, each mod providing what its role says. Your old
+presets are listed as packs.
+
+## The Library
+
+The **Library** subtab of the Refmods tab holds every H3 and Flux mod. Pick a folder or pack on the left, search
+and filter at the top, and click a mod to see what's stored in it, rename or move it, edit its description and
+concept, or save a copy. Ctrl-click or tick several to move, delete or update them together, or drag them onto a
+folder.
+
+What needs the model runs as a short task on the model picked at the top: **Decompile** (the pictures, video and
+sound as files), **Strength preview** (the first picture at a few strengths), **Decode to listen** for a voice,
+encoder frames, soundtracks, **Clean audio** and **Convert to Flux**. **Replace preview** sets the picture shown
+for a mod, from a file or from a decompiled or strength-preview picture. The mod itself doesn't change.
+
 ## Installing
 
 1. Put the `Wan2GP-Refmods-Studio` folder in WanGP's `plugins` folder.
@@ -46,7 +66,8 @@ twice. It says so in the console and on its tab.
 
 Nothing needs moving:
 
-- Mods and presets stay in `loras/refmods_plugin/`, as with Refmods For Wan GP.
+- Mods and presets stay in `loras/refmods_plugin/`, as with Refmods For Wan GP. Packs are in its `packs/` folder
+  and custom previews in `previews/`.
 - Drafts, saved prompts and saved subjects stay in `loras/h3_prompt_builder/`, as with the Prompt Builder 4.4.0.
   If you're coming from 4.3 or earlier, they're copied in from the old plugin folder the first time Refmods Studio
   starts.

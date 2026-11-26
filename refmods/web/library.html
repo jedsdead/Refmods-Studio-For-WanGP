@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Refmods Library</title>
+<link rel="stylesheet" href="static/library.css?v=__V__">
+</head>
+<body>
+<div id="app">
+
+<header class="toolbar">
+  <input id="search" type="search" placeholder="Search names, descriptions, tags" aria-label="Search">
+  <div class="seg" id="kinds" role="group" aria-label="Kind">
+    <button data-kind="" class="on">All</button><button data-kind="image">Pictures</button><button data-kind="video">Video</button><button data-kind="audio">Audio</button>
+  </div>
+  <select id="concept" aria-label="Concept"><option value="">Any concept</option></select>
+  <select id="sort" aria-label="Sort">
+    <option value="name">Name</option><option value="new">Newest</option><option value="size">Largest</option><option value="tokens">Most tokens</option>
+  </select>
+  <span class="grow"></span>
+  <label class="inline" title="Decoding, strength previews, encoder frames and soundtracks run as a short task on this model">Model
+    <select id="model" aria-label="MiniMax H3 model for jobs"></select></label>
+  <div class="menu">
+    <button id="menuBtn" aria-haspopup="true" aria-expanded="false" title="More">⋯</button>
+    <div class="menu-list" id="menuList" hidden>
+      <button data-act="frames-all">Store encoder frames for every mod missing them</button>
+      <button data-act="reclassify">Re-check picture and video kinds</button>
+      <button data-act="refresh">Refresh</button>
+    </div>
+  </div>
+</header>
+
+<div class="bulk" id="bulk" hidden>
+  <span id="bulkCount"></span>
+  <select id="bulkDest" aria-label="Move to"></select><button id="bulkMove">Move</button>
+  <span class="sep"></span>
+  <button id="bulkFrames" title="Decode and store the pictures the text encoder is shown">Store encoder frames</button>
+  <button id="bulkClean" title="Keep voices only; saved as copies">Clean audio</button>
+  <button id="bulkHint" title="Copy a prompt line built from the descriptions">Copy prompt hint</button>
+  <button id="bulkDelete" class="danger">Delete</button>
+  <span class="grow"></span>
+  <button id="bulkClear" class="small">Clear selection</button>
+</div>
+
+<main class="cols">
+  <nav class="side" id="side" aria-label="Folders"></nav>
+
+  <section class="gridwrap">
+    <div class="grid-head"><span id="count" class="muted"></span><span class="grow"></span>
+      <span class="muted small">Click to open · Ctrl-click or tick to select several · drag onto a folder to move</span></div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <aside class="details" id="details">
+    <div class="empty-detail">Pick a mod to see what's inside it.</div>
+  </aside>
+</main>
+
+<div class="jobs" id="jobs" aria-live="polite"></div>
+<div class="toast" id="toast" role="status"></div>
+<input type="file" id="pickPreview" accept="image/*" hidden>
+<input type="file" id="pickAudio" accept="audio/*,video/*" hidden>
+</div>
+<script src="static/library.js?v=__V__"></script>
+</body>
+</html>

@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.5.0] — 2026-11-26
+
+- **The Library is a web app**, in the Library subtab of the Refmods tab. It replaces the Library and Decompile
+  subtabs and keeps everything they did.
+  - Folders and packs on the left, with counts. Make a folder there, delete an empty one, or drag mods onto one to
+    move them.
+  - Search names, descriptions, concepts and packs. Filter by kind and concept, and sort by name, date, size or
+    tokens.
+  - Mods are cards with their first stored frame. Badges show the kind, a soundtrack, missing encoder frames and Flux
+    mods.
+  - The details panel shows the stored frames and what's stored. There you can rename or move a mod, edit its
+    description and concept, save a copy, or delete it. Renaming keeps the mod in its packs.
+  - Several at once: move, store encoder frames, clean audio, copy a prompt hint, delete.
+- **Replace preview**: set the picture shown for a mod, from a file or from a decompiled or strength-preview picture.
+  The mod itself doesn't change. Previews are kept in `loras/refmods_plugin/previews/`.
+- **Strength preview**: the mod's first picture as the model gets it at three strengths you choose, up to 2.
+- **Decode to listen**: a voice or soundtrack decoded and played in the panel.
+- Jobs that need the model (decompile, strength preview, encoder frames, soundtracks, clean audio, convert to Flux)
+  run as short tasks on the model picked at the top, with their progress shown in the corner.
+
 ## [0.4.0] — 2026-11-26
 
 - **Packs.** A pack is a set of mods, each with its role (identity, clothing, reference sheet, pose and motion,
