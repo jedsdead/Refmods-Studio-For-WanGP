@@ -14,6 +14,8 @@ tab with a full-screen mode. The entries below are the changes on the way here.
   height.
 - In full screen, each page's switch lists the subtabs that exist, Settings included.
 - Without Refmods, the Prompt Builder hides its pack buttons.
+- The README has screenshots, made with invented mods and placeholder pictures.
+- An age typed in full ("in her 40s") no longer comes out as "in her in her 40s".
 - **Flux mods have previews.** New Flux mods (including ones converted from H3) store a small JPEG of each source
   picture, so the Library shows them like an H3 mod's frames. Loaders read only the latent, so the files still work
   everywhere. Older Flux mods get a rough preview worked out from the latent (no model needed, the file isn't
