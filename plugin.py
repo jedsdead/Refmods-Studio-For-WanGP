@@ -20,7 +20,6 @@ enabled: pipeline hooks installed twice break generation.
 """
 
 import json
-import os
 import shutil
 import sys
 import traceback
