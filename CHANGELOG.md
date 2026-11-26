@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.1] — 2026-11-26
+
+- The Prompt Builder's right-click menu really closes now. It was being closed, but its style kept it on screen; the
+  name suggestions had the same problem.
+
 ## [0.9.0] — 2026-11-26
 
 Prompt Builder:

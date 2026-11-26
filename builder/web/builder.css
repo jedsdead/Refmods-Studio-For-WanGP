@@ -1,3 +1,5 @@
+/* Anything hidden stays hidden, whatever display a class gives it (the right-click menu, suggestions, switches). */
+[hidden] { display: none !important; }
 :root {
   --bg: #0b0f19; --panel: #111827; --panel2: #0f1522; --line: #1f2937; --line2: #374151;
   --text: #e5e7eb; --muted: #9ca3af; --faint: #6b7280; --accent: #6366f1; --accent-bg: #312e81;
