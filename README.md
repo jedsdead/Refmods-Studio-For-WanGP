@@ -5,6 +5,8 @@ The button at the right of each page's header opens it full screen; Esc goes bac
 
 ![The Prompt Builder](docs/images/prompt-builder.png)
 
+![The Prompt Builder with Subjects folded: Insert, the writing boxes and the live preview](docs/images/prompt-builder-2.png)
+
 - **Refmods**: no-training reference mods for MiniMax H3 (Ref2VA, FL2VA, FL2VA ControlNet, H3-Image, P-H3-Image)
   and Flux 2 / Flux 3. Compress a reference into a small `.safetensors` file once, then reuse it at any strength
   without re-encoding it every generation.
