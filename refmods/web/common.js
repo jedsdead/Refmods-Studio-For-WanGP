@@ -299,10 +299,16 @@
       pdoc = window.parent.document;
     } catch (_) { return; }                        // opened on its own, or an older WanGP
     // Both Refmods Studio pages have a button, so each keeps its own icon in step.
+    const tabs = () => [...pdoc.querySelectorAll(".rs-studio-tabs button[role=tab]")];
+    // The switch lists the subtabs that exist (a part that's turned off has none), this page lit.
+    const drawSwitch = () => {
+      if (switcher) switcher.innerHTML = tabs().map((t) => { const l = t.textContent.trim(); return `<button data-sub="${RS.esc(l)}" class="${l === "Refmods" ? "on" : ""}">${RS.esc(l)}</button>`; }).join("");
+    };
     const paint = () => {
       const on = pdoc.documentElement.classList.contains("wangp-addon-fullscreen-open");
       document.documentElement.classList.toggle("rs-full", on);
       if (button) { button.title = on ? "Back to WanGP (Esc)" : "Open Full Screen"; button.setAttribute("aria-label", button.title); button.innerHTML = on ? EXIT : EXPAND; }
+      if (on) drawSwitch();
     };
     new MutationObserver(paint).observe(pdoc.documentElement, { attributes: true, attributeFilter: ["class"] });
     paint();
@@ -311,10 +317,11 @@
           !document.querySelector("dialog[open], .zoom")) button.click();
     });
     // In full screen the frame covers WanGP's subtab bar, so the page offers the switch itself.
-    if (switcher) switcher.querySelectorAll("button[data-sub]").forEach((b) => b.addEventListener("click", () => {
-      const tab = [...pdoc.querySelectorAll(".rs-studio-tabs button[role=tab]")].find((t) => t.textContent.trim() === b.dataset.sub);
+    if (switcher) switcher.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-sub]"); if (!b) return;
+      const tab = tabs().find((t) => t.textContent.trim() === b.dataset.sub);
       if (tab) tab.click();
-    }));
+    });
   };
 
   // ---------------------------------------------------------------- start

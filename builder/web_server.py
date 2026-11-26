@@ -42,6 +42,7 @@ def create_app(plugin, host):
     def session():
         snap = host.snapshot()
         snap["lists"] = {"prompts": service.prompt_names(), "subjects": service.subject_names()}
+        snap["refmods"] = service._storage() is not None   # packs and armed mods need the Refmods part
         snap["vocab"] = {"modes": list(core.MODES), "kinds": list(core.KINDS), "genders": list(core.GENDERS),
                          "parts": list(core.PARTS), "default_parts": list(core.DEFAULT_PARTS),
                          "languages": list(core.LANGUAGES), "camera": list(core.CAMERA_MOVES),
@@ -57,20 +58,6 @@ def create_app(plugin, host):
                          "carries": list(core.CARRY_PHRASES),
                          "max_looks": core.MAX_LOOKS}
         return snap
-
-    @app.get("/api/studio_settings")
-    def studio_settings():
-        studio = getattr(plugin, "_studio", None)
-        if studio is None:
-            return {"version": "", "refmods": True, "builder": True, "problems": [], "path": "", "missing": True}
-        return studio.studio_settings()
-
-    @app.post("/api/studio_settings")
-    def save_studio_settings(payload: dict = Body(...)):
-        studio = getattr(plugin, "_studio", None)
-        if studio is None:
-            return {"ok": False, "note": "The settings can't be reached from here."}
-        return studio.save_studio_settings(bool(payload.get("refmods", True)), bool(payload.get("builder", True)))
 
     @app.get("/api/thumb/{key:path}")
     def thumb(key: str):

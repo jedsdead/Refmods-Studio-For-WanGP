@@ -617,10 +617,17 @@
       button = box.children.length > before ? box.lastElementChild : null;
       pdoc = window.parent.document;
     } catch (_) { return; }
+    const SELF = "Prompt Builder";
+    const tabs = () => [...pdoc.querySelectorAll(".rs-studio-tabs button[role=tab]")];
+    // The switch lists the subtabs that exist (a part that's turned off has none), this page lit.
+    const drawSwitch = () => {
+      $("subSwitch").innerHTML = tabs().map((t) => { const l = t.textContent.trim(); return `<button data-sub="${esc(l)}" class="${l === SELF ? "on" : ""}">${esc(l)}</button>`; }).join("");
+    };
     const paint = () => {
       const on = pdoc.documentElement.classList.contains("wangp-addon-fullscreen-open");
       document.documentElement.classList.toggle("rs-full", on);
       if (button) { button.title = on ? "Back to WanGP (Esc)" : "Open Full Screen"; button.setAttribute("aria-label", button.title); button.innerHTML = on ? EXIT : EXPAND; }
+      if (on) drawSwitch();
     };
     new MutationObserver(paint).observe(pdoc.documentElement, { attributes: true, attributeFilter: ["class"] });
     paint();
@@ -628,10 +635,11 @@
       if (e.key === "Escape" && !e.defaultPrevented && button && document.documentElement.classList.contains("rs-full") &&
           !document.querySelector("dialog[open]") && $("ctx").hidden && $("suggest").hidden) button.click();
     });
-    $("subSwitch").querySelectorAll("button[data-sub]").forEach((b) => b.addEventListener("click", () => {
-      const tab = [...pdoc.querySelectorAll(".rs-studio-tabs button[role=tab]")].find((t) => t.textContent.trim() === b.dataset.sub);
+    $("subSwitch").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-sub]"); if (!b) return;
+      const tab = tabs().find((t) => t.textContent.trim() === b.dataset.sub);
       if (tab) tab.click();
-    }));
+    });
   }
 
   // ---------------------------------------------------------------- session
@@ -640,6 +648,7 @@
       const s = await api("session");
       const fresh = s.captured_at !== S.capturedAt;
       S.session = s; S.vocab = s.vocab; S.capturedAt = s.captured_at;
+      for (const id of ["packSel", "btnPackLoad", "btnPackSave"]) $(id).hidden = s.refmods === false;
       if (first) {
         options($("camMove"), [["", "move"]].concat(S.vocab.camera.map((m) => [m, m])), "");
         options($("camVerb"), [["", "Auto"]].concat(S.vocab.cuts.map((v) => [v, v.replace("the ", "")]), S.vocab.continues.map((v) => [v, v.replace("the ", "")])), "");
@@ -812,20 +821,6 @@
     };
     $("subFold").addEventListener("click", () => fold($("subBody").hidden));
     try { if (localStorage.getItem("rs-subjects-open") === "0") fold(false); } catch (_) { /* no storage here */ }
-    $("btnSettings").addEventListener("click", async () => {
-      let st;
-      try { st = await api("studio_settings"); } catch (err) { status(err.message); return; }
-      if (st.missing) { status("The settings can't be reached from here."); return; }
-      $("setTitle").textContent = "Refmods Studio " + st.version;
-      $("setRefmods").checked = !!st.refmods; $("setBuilder").checked = !!st.builder; $("setNote").textContent = "";
-      $("setProblems").innerHTML = (st.problems || []).map((p) => `<li class="e">Not loaded this session: ${esc(p)}</li>`).join("");
-      $("setDlg").showModal();
-    });
-    $("setSave").addEventListener("click", async () => {
-      const r = await api("studio_settings", { refmods: $("setRefmods").checked, builder: $("setBuilder").checked });
-      $("setNote").textContent = r.note || "";
-    });
-    $("setClose").addEventListener("click", () => $("setDlg").close());
     $("btnLibrary").addEventListener("click", openLibrary);
     $("libClose").addEventListener("click", () => $("libDlg").close());
     $("libSearch").addEventListener("input", drawLibrary);

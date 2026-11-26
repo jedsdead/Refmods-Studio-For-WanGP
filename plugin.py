@@ -226,6 +226,7 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
         self._rs_forward = set(_ALWAYS_FORWARD)
         self._rs_subtabs = []          # (label, constructor, half): the halves' tabs, as subtabs
         self._rs_blocked = []
+        self._rs_settings_path = None  # the Settings page, once registered
         super().__init__()
         self.name = PLUGIN_NAME
         self.version = PLUGIN_VERSION
@@ -255,7 +256,6 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
             try:
                 module, plugin = _load_half(half)
                 self._rs_halves[half] = plugin
-                plugin._studio = self           # the pages' Settings read and save through the host
                 if half == "refmods":
                     globals()["MiniMaxH3RefModsPlugin"] = _ClassRef(
                         module.MiniMaxH3RefModsPlugin)
@@ -316,13 +316,17 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
         for half, plugin in self._rs_halves.items():
             self._rs_gather(half, plugin)
 
-        # One Refmods Studio tab, with each half's tab as a subtab.
-        if self._rs_subtabs:
-            self.add_tab(tab_id="refmods_studio", label=PLUGIN_NAME, component_constructor=self._rs_studio_ui)
+        # The Settings subtab is the host's own page, so it's there whichever half is off.
+        self._rs_settings_path = None
+        try:
+            from .studio_settings_page import WEB_PATH as SETTINGS_PATH, create_app as create_settings_app
+            self.register_web_app(SETTINGS_PATH, lambda: create_settings_app(self))
+            self._rs_settings_path = SETTINGS_PATH
+        except Exception as exc:                      # noqa: BLE001
+            print(f"[{PLUGIN_NAME}] the Settings page could not be set up, so it falls back to the old panel: {exc!r}")
 
-        if not self._rs_halves:
-            self.add_tab(tab_id="refmods_studio", label=PLUGIN_NAME,
-                         component_constructor=self._rs_settings_ui)
+        # One Refmods Studio tab: a subtab for each half that's on, then Settings.
+        self.add_tab(tab_id="refmods_studio", label=PLUGIN_NAME, component_constructor=self._rs_studio_ui)
 
     def _rs_gather(self, half, plugin):
         """Move what a half registered onto the host, where WanGP reads it."""
@@ -367,7 +371,7 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
                 ".wangp-addon-fullscreen .rs-studio-tabs .wangp-addon-web-view iframe { z-index: 10; }"
                 ".wangp-addon-fullscreen .rs-studio-tabs > .tab-wrapper { visibility: hidden; }</style>",
                 padding=False)
-        # The settings are in the pages now (Refmods → Setup, and Settings in the Prompt Builder's header).
+        # Settings is the last subtab, served by the host (studio_settings_page.py).
         with gr.Tabs(elem_classes="rs-studio-tabs"):
             for label, constructor, half in self._rs_subtabs:
                 with gr.Tab(label):
@@ -379,6 +383,13 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
                     except Exception as exc:          # noqa: BLE001
                         self._rs_fail(half, f"could not build its {label} tab", exc)
                         gr.Markdown(f"⚠️ The {label} tab could not be built: `{exc!r}`. The console has the details.")
+            with gr.Tab("Settings"):
+                if self._rs_settings_path:
+                    gr.HTML(f'<div class="wangp-addon-web-view"><iframe src="{self._rs_settings_path}/?embedded=1" '
+                            'style="width:100%;height:calc(100vh - 160px);border:0;display:block" '
+                            'title="Refmods Studio settings"></iframe></div>', padding=False)
+                else:
+                    self._rs_settings_ui()
 
     def post_ui_setup(self, components):
         updates = {}

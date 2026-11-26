@@ -113,10 +113,10 @@ Nothing needs moving:
 
 ## Settings
 
-The settings are on the Refmods **Setup** page and behind **Settings** in the Prompt Builder's header. Untick
-**Refmods** or **Prompt Builder** to hide that half completely, then restart WanGP. With both off, the tab shows
-just these settings. A half that's off isn't loaded at all: turning off Refmods also removes its
-pipeline hooks.
+**Settings** is the last subtab, beside Refmods and Prompt Builder, and it's there whichever part is on. Untick
+**Refmods** or **Prompt Builder** to hide that part completely, then restart WanGP. A part that's off isn't loaded at
+all (turning off Refmods also removes its pipeline hooks), and the other keeps working. Without Refmods, the Prompt
+Builder hides its pack buttons, since packs and armed mods come from Refmods.
 
 ## Credits
 

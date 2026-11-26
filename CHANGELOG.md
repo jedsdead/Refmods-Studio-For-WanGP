@@ -9,8 +9,11 @@ tab with a full-screen mode. The entries below are the changes on the way here.
   buttons.
 - The video-mod setting for later windows no longer calls "First frame as a still" recommended.
 - In full screen, the subtab bar's blue underline no longer shows through on top of the page.
-- The Refmods Studio settings are in the pages: the Refmods **Setup** page, and **Settings** in the Prompt Builder's
-  header. The Gradio fold above the subtabs is gone, so the pages get its height.
+- **Settings** is its own subtab beside Refmods and Prompt Builder: a small page served by Refmods Studio itself, so
+  it's there with either part, or both, turned off. The Gradio fold above the subtabs is gone, so the pages get its
+  height.
+- In full screen, each page's switch lists the subtabs that exist, Settings included.
+- Without Refmods, the Prompt Builder hides its pack buttons.
 
 ## [0.9.2] — 2026-11-26
 

@@ -13,16 +13,7 @@
     let d;
     try { d = await api("setup?model=" + RS.enc(RS.model())); } catch (e) { box.innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
     const m = RS.session.models || {};
-    let st = null;
-    try { st = await api("studio_settings"); } catch (_) { /* older host */ }
     box.innerHTML = `
-      ${st && !st.missing ? `<h3>Refmods Studio ${esc(st.version)}</h3>
-      <p class="explain">Turn either half off to hide it completely. A half that's off isn't loaded at all, so turning off Refmods also removes its pipeline hooks. Restart WanGP after saving.</p>
-      ${(st.problems || []).length ? `<div class="err">Not loaded this session: ${st.problems.map(esc).join("; ")}. The console has the details.</div>` : ""}
-      <div class="row"><label class="inline"><input type="checkbox" id="stRefmods" ${st.refmods ? "checked" : ""}> Refmods</label>
-        <label class="inline"><input type="checkbox" id="stBuilder" ${st.builder ? "checked" : ""}> Prompt Builder</label>
-        <button id="stSave">Save</button><span class="muted small" id="stNote"></span></div>` : ""}
-
       <h3>This model</h3>
       <p class="explain">Checks that Refmods is hooked into the MiniMax H3 model picked at the top. Run it if mods seem to have no effect.</p>
       <ul class="checks">${(d.lines || []).map((l) => `<li>${md(l)}</li>`).join("")}</ul>
@@ -37,10 +28,6 @@
       <h3>Where things are</h3>
       <div class="box">${(d.paths || []).map(([k, v]) => `<div><b>${esc(k)}</b>: <code>${esc(v)}</code></div>`).join("")}</div>
       ${(d.errors || []).map((e) => `<div class="err">${esc(e)}</div>`).join("")}`;
-    if ($("stSave")) $("stSave").addEventListener("click", async () => {
-      const r = await api("studio_settings", { refmods: $("stRefmods").checked, builder: $("stBuilder").checked });
-      $("stNote").textContent = r.note || "";
-    });
     $("sRecheck").addEventListener("click", render);
     $("sModels").addEventListener("click", async () => {
       RS.session = await api("session");
