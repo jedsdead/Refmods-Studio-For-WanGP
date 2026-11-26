@@ -130,6 +130,7 @@ def read_meta(name: str) -> Optional[Dict]:
             shapes = [list(f.get_slice(k).get_shape()) for k in _sample_keys(keys)]
     except Exception:
         return None
+    meta["preview_count"] = len(preview_keys(keys))
     pictures = sum(s[0] if len(s) == 4 else 1 for s in shapes)
     tokens = sum((s[0] if len(s) == 4 else 1) * s[-2] * s[-1] for s in shapes)
     meta.update({"pictures": pictures, "tokens": tokens,
@@ -161,7 +162,66 @@ def load_latents(name: str) -> List[torch.Tensor]:
     return out
 
 
-def save_mod(name: str, latents: List[torch.Tensor], meta: Dict) -> str:
+PREVIEW_EDGE = 512
+
+
+def preview_jpeg(image: Image.Image, edge: int = PREVIEW_EDGE) -> bytes:
+    import io
+    image = image.convert("RGB")
+    image.thumbnail((edge, edge), Image.Resampling.LANCZOS)
+    buf = io.BytesIO()
+    image.save(buf, format="JPEG", quality=88)
+    return buf.getvalue()
+
+
+def preview_keys(keys) -> List[str]:
+    """The stored preview pictures, enc_0 .. enc_N, in order (the same keys H3 mods use for their frames)."""
+    return sorted((k for k in keys if k.startswith("enc_") and k[4:].isdigit()), key=lambda k: int(k[4:]))
+
+
+def read_preview(name: str, index: int = 0) -> Optional[bytes]:
+    """One stored preview picture (JPEG bytes), or None for a mod made before they were stored."""
+    from safetensors import safe_open
+    try:
+        with safe_open(mod_path(name), framework="pt", device="cpu") as f:
+            key = f"enc_{int(index)}"
+            return bytes(f.get_tensor(key).numpy().tobytes()) if key in f.keys() else None
+    except Exception:
+        return None
+
+
+# Flux 2 latent -> rough RGB, for mods made before previews were stored. A linear projection, so the picture is
+# soft and the colours approximate. Factors from ComfyUI's Flux2 latent format (comfy/latent_formats.py).
+_RGB_FACTORS = [
+    [0.0058, 0.0113, 0.0073], [0.0495, 0.0443, 0.0836], [-0.0099, 0.0096, 0.0644], [0.2144, 0.3009, 0.3652],
+    [0.0166, -0.0039, -0.0054], [0.0157, 0.0103, -0.0160], [-0.0398, 0.0902, -0.0235], [-0.0052, 0.0095, 0.0109],
+    [-0.3527, -0.2712, -0.1666], [-0.0301, -0.0356, -0.0180], [-0.0107, 0.0078, 0.0013], [0.0746, 0.0090, -0.0941],
+    [0.0156, 0.0169, 0.0070], [-0.0034, -0.0040, -0.0114], [0.0032, 0.0181, 0.0080], [-0.0939, -0.0008, 0.0186],
+    [0.0018, 0.0043, 0.0104], [0.0284, 0.0056, -0.0127], [-0.0024, -0.0022, -0.0030], [0.1207, -0.0026, 0.0065],
+    [0.0128, 0.0101, 0.0142], [0.0137, -0.0072, -0.0007], [0.0095, 0.0092, -0.0059], [0.0000, -0.0077, -0.0049],
+    [-0.0465, -0.0204, -0.0312], [0.0095, 0.0012, -0.0066], [0.0290, -0.0034, 0.0025], [0.0220, 0.0169, -0.0048],
+    [-0.0332, -0.0457, -0.0468], [-0.0085, 0.0389, 0.0609], [-0.0076, 0.0003, -0.0043], [-0.0111, -0.0460, -0.0614],
+]
+_RGB_BIAS = [-0.0329, -0.0718, -0.0851]
+
+
+def latent_preview(latent: torch.Tensor, edge: int = 384) -> Image.Image:
+    """A rough picture of one [1, 128, h, w] latent, without the VAE: the 128 channels are 32 channels at 2x2,
+    which a fixed 32x3 table turns into RGB."""
+    t = latent.detach().float().cpu()
+    if t.dim() == 3:
+        t = t.unsqueeze(0)
+    n, _, h, w = t.shape
+    t = t.reshape(n, 32, 2, 2, h, w).permute(0, 1, 4, 2, 5, 3).reshape(n, 32, h * 2, w * 2)
+    rgb = torch.einsum("nchw,cr->nrhw", t, torch.tensor(_RGB_FACTORS)) + torch.tensor(_RGB_BIAS).view(1, 3, 1, 1)
+    rgb = ((rgb[0].clamp(-1, 1) + 1) * 127.5).round().byte().permute(1, 2, 0).numpy()
+    image = Image.fromarray(rgb, "RGB")
+    scale = edge / max(image.size)
+    return image.resize((max(1, round(image.width * scale)), max(1, round(image.height * scale))),
+                        Image.Resampling.BICUBIC)
+
+
+def save_mod(name: str, latents: List[torch.Tensor], meta: Dict, previews: Optional[List[bytes]] = None) -> str:
     from safetensors.torch import save_file
     path = mod_path(name)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -172,6 +232,11 @@ def save_mod(name: str, latents: List[torch.Tensor], meta: Dict) -> str:
         tensors = {"samples": latents[0]}
         tensors.update({f"samples_{i}": l for i, l in enumerate(latents[1:], start=1)})
     tokens = sum(l.shape[-2] * l.shape[-1] for l in latents)
+    # The source pictures as small JPEGs, for the Library. Loaders read only "samples", so these are ignored there.
+    for i, data in enumerate(previews or []):
+        tensors[f"enc_{i}"] = torch.frombuffer(bytearray(data), dtype=torch.uint8).clone()
+    if previews:
+        meta = {**meta, "enc_layout": "stills", "enc_max_edge": PREVIEW_EDGE}
     header = {"name": _clean_relpath(name).split("/")[-1], "mode": "encode", "channels": LATENT_CHANNELS,
               "shape": list(latents[0].shape), "token_count": tokens, "pictures": len(latents),
               "generator": "WanGP MiniMaxH3Mod (Refmod-Fork)", **meta}
@@ -578,7 +643,8 @@ def run_extract(owner, job: dict, flux3: bool, set_progress_status=None, tile_si
                              "description": job.get("description") or "",
                              "token_budget": budget, "resolution": max(sized[0].size),
                              "layout": layout, "sources": len(pictures),
-                             **({"converted_from": job["converted_from"]} if job.get("converted_from") else {})})
+                             **({"converted_from": job["converted_from"]} if job.get("converted_from") else {})},
+             previews=[preview_jpeg(p) for p in pictures])
     tokens = sum(l.shape[-2] * l.shape[-1] for l in latents)
     what = {LAYOUT_SEPARATE: f"{len(latents)} reference(s)",
             LAYOUT_SHEET: f"one contact sheet of {len(pictures)} pictures",

@@ -126,6 +126,8 @@ Builder hides its pack buttons, since packs and armed mods come from Refmods.
   the Refmods half is built on. See [`docs/refmods.md`](docs/refmods.md) for what came from its later releases.
 - **Adudeguyman** ([ComfyUI-Fantastic-MiniMaxH3-PromptBuilder](https://github.com/Adudeguyman/ComfyUI-Fantastic-MiniMaxH3-PromptBuilder)):
   the ideas for coloured tag chips, the prompt library and the scratchpad, built here in this plugin's own way.
+- **ComfyUI** ([comfyanonymous/ComfyUI](https://github.com/comfyanonymous/ComfyUI)): the Flux 2 latent-to-RGB factors
+  used for the rough previews of older Flux mods.
 - **malcolmrey** ([ComfyUI-Flux2Klein9Mod](https://github.com/malcolmamal/ComfyUI-Flux2Klein9Mod)): the Flux 2 /
   Klein RefMod file layout used by the Flux mods.
 

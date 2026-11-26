@@ -151,9 +151,11 @@ def _flux_item(name):
         "length": f"{pictures} picture{'s' if pictures != 1 else ''}",
         "size_mb": meta.get("size_mb", 0), "mtime": os.path.getmtime(path),
         "concept": meta.get("concept_type") or "generic", "description": meta.get("description") or "",
-        "has_audio": False, "frames": 0, "packs": [],
+        "has_audio": False, "frames": int(meta.get("preview_count") or 0), "packs": [],
         "custom_preview": os.path.isfile(preview_file("flux", name)),
-        "usable": bool(meta.get("usable", True)), "thumb": os.path.isfile(preview_file("flux", name)),
+        "usable": bool(meta.get("usable", True)),
+        # Older mods without stored previews get one worked out from the latent (see _flux_auto_preview).
+        "thumb": bool(meta.get("usable", True)) or os.path.isfile(preview_file("flux", name)),
     }
 
 
@@ -195,7 +197,11 @@ def details(mod_id):
             facts.append(("Converted from", f"H3 · {meta['converted_from']}"))
         if not item["usable"]:
             facts.append(("Warning", "not a Flux 2 latent, so it won't load"))
-        return {"item": item, "facts": facts, "frames": [], "tags": [], "outputs": _outputs(model, name),
+        facts.append(("Previews", f"{item['frames']} stored, one per source picture" if item["frames"] else
+                      "not stored (made before they were), so the Library shows a rough one worked out from the "
+                      "latent. Replace preview sets a proper one."))
+        frames = [{"index": i, "label": f"picture {i + 1}"} for i in range(item["frames"])]
+        return {"item": item, "facts": facts, "frames": frames, "tags": [], "outputs": _outputs(model, name),
                 "strength": [], "pictures": 0, "audio_seconds": 0}
     meta, keys = _h3_header(name)
     if meta is None:
@@ -285,10 +291,30 @@ def _jpeg(image, edge, quality=88):
     return buf.getvalue()
 
 
+def _flux_auto_preview(name):
+    """A rough preview for a Flux mod made before previews were stored: its first latent turned into RGB without
+    the VAE, cached beside the custom previews and redone when the mod changes. The mod file isn't touched."""
+    mod = flux.mod_path(name)
+    cache = preview_file("flux_auto", name)
+    if os.path.isfile(cache) and os.path.getmtime(cache) >= os.path.getmtime(mod):
+        return cache
+    latents = flux.load_latents(name)
+    os.makedirs(os.path.dirname(cache), exist_ok=True)
+    flux.latent_preview(latents[0]).save(cache, format="JPEG", quality=90)
+    return cache
+
+
 def thumb(mod_id, big=False):
     model, name = split_id(mod_id)
     custom = preview_file(model, name)
-    source = custom if os.path.isfile(custom) else (mod_file(model, name) if model == "h3" else None)
+    source = custom if os.path.isfile(custom) else (mod_file(model, name) if model in ("h3", "flux") else None)
+    if source and model == "flux" and source != custom and os.path.isfile(source):
+        if flux.read_preview(name, 0) is None:
+            try:
+                source = custom = _flux_auto_preview(name)   # read below like a custom preview
+            except Exception as exc:                                 # noqa: BLE001
+                print(f"[Refmods] no preview for Flux/{name}: {exc!r}")
+                return None
     if not source or not os.path.isfile(source):
         return None
     key = (source, os.path.getmtime(source), big)
@@ -298,7 +324,7 @@ def thumb(mod_id, big=False):
     if source == custom:
         data = _jpeg(Image.open(custom), PREVIEW_EDGE if big else THUMB_EDGE)
     else:
-        raw = _enc_jpeg(name, 0)
+        raw = flux.read_preview(name, 0) if model == "flux" else _enc_jpeg(name, 0)
         if raw is None:
             return None
         data = raw if big else _jpeg(Image.open(io.BytesIO(raw)), THUMB_EDGE)
@@ -311,7 +337,7 @@ def thumb(mod_id, big=False):
 
 def frame(mod_id, index):
     model, name = split_id(mod_id)
-    return _enc_jpeg(name, index) if model == "h3" else None
+    return _enc_jpeg(name, index) if model == "h3" else flux.read_preview(name, index)
 
 
 def set_preview(mod_id, data):
@@ -428,9 +454,9 @@ def delete(ids):
         model, name = split_id(mod_id)
         ok = flux.delete_mod(name) if model == "flux" else storage.delete_refmod(name)
         (gone if ok else missing).append(name)
-        preview = preview_file(model, name)
-        if ok and os.path.isfile(preview):
-            os.remove(preview)
+        for preview in (preview_file(model, name), preview_file("flux_auto", name) if model == "flux" else ""):
+            if ok and preview and os.path.isfile(preview):
+                os.remove(preview)
     message = f"Deleted {len(gone)} mod(s)." if gone else "Nothing deleted."
     if missing:
         message += " Not found: " + ", ".join(missing)
