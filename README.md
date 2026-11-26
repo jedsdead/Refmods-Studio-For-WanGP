@@ -34,8 +34,11 @@ any mods in the Refmods panel. The **Prompt Builder** subtab reads them:
 - **Line** extras: what they do as they speak, same voice as an earlier line, **Cut off** (`<cutoff>`) and a line
   that carries across the cut (`<scenetrans>`, with the next Shot writing the receiving half). **Text** writes
   readable on-screen text.
-- **Scene**, **Sound** and **Music** presets compose the old builder's sentences: style, place, time, light,
-  atmosphere and grade; ambience; instruments, tempo and dynamics. Every box can be typed in.
+- **Scene** (in Insert, above Camera) writes one opening sentence into Style from the style, place, time, light,
+  atmosphere, grade and camera or film. **Sound** and **Music** presets compose ambience, and instruments, tempo
+  and dynamics. Every box can be typed in.
+- **Draft** on Summary writes who, where and when, with the situation as far as the action shows it.
+- **Subjects** folds away when it gets long: click its title.
 - Tags are **coloured** in every box. The **Scratchpad** under Action is for trying wording; Commit puts it in Action.
 - **Phrases** keeps wording you reuse: select text and press Ctrl+Enter to save it.
 - **Switches** above the preview leave a section out without deleting it; the subject editor does the same for a

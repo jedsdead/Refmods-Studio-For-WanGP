@@ -145,7 +145,7 @@ SUBJECT_KEYS = ("kind", "name", "gender", "age", "ethnicity", "height", "build",
 LIBRARY_KEYS = tuple(k for k in SUBJECT_KEYS if k not in ("look", "voice", "def_off", "ret_off"))
 
 FORM_KEYS = ("mode", "duration", "summary", "style", "action", "sound", "music", "subjects", "window_duration", "off",
-             "ref_layout", "scratch")
+             "ref_layout", "scratch", "scene")
 # Sections that can be switched off without deleting what's in them (detailed_description can't).
 SWITCHABLE = ("subject_definitions", "summary", "retention_analysis", "overall_soundscape", "non_diegetic_music")
 
@@ -162,7 +162,7 @@ def new_subject(kind="Character") -> dict:
 
 def new_form() -> dict:
     return {"mode": AUTO, "duration": 10.0, "summary": "", "style": "", "action": "", "sound": "",
-            "music": "N/A", "subjects": [], "window_duration": False, "off": [], "ref_layout": False, "scratch": ""}
+            "music": "N/A", "subjects": [], "window_duration": False, "off": [], "ref_layout": False, "scratch": "", "scene": {}}
 
 
 def clean_look(item, parts=None, sheet=False) -> dict:
@@ -207,6 +207,8 @@ def clean_form(data) -> dict:
     form["window_duration"] = bool(form["window_duration"])
     form["off"] = [x for x in (form["off"] or []) if x in SWITCHABLE]
     form["ref_layout"] = bool(form["ref_layout"])
+    scene = form["scene"] if isinstance(form["scene"], dict) else {}
+    form["scene"] = {k: _s(scene.get(k)) for k in SCENE_KEYS if _s(scene.get(k))}
     return form
 
 
@@ -804,9 +806,15 @@ def retention_lines(form: dict, media: list[Media]) -> str:
     return "\n".join(lines)
 
 
+SCENE_KEYS = ("style", "location", "time", "lighting", "atmosphere", "grade", "body")
+FIGHT_WORDS = re.compile(r"\b(fight\w*|duel\w*|punch\w*|kick\w*|strik\w*|slash\w*|parr\w*|lightsabers? clash\w*|"
+                         r"swords?|blades? clash\w*|grappl\w*|brawl\w*|attack\w*)\b", re.I)
+
+
 def draft_summary(form: dict, mode: str) -> str:
-    """A first summary from the form, in the guide's shape: who and where, for
-    you to finish with the situation. Never the dialogue, events or shots."""
+    """A first summary in the guide's shape: who, where and when, with the situation as far as the form shows it
+    (a fight, a conversation, one person speaking). Never the dialogue, events or shots, which the summary would
+    replay at a moment of its own."""
     form = clean_form(form)
     reference = mode == "Reference"
     people, places = [], []
@@ -814,17 +822,48 @@ def draft_summary(form: dict, mode: str) -> str:
         name = _s(s.get("name"))
         label = f"<Subject {n}>" if reference else (name or f"a {gender_noun(s)}")
         (places if s.get("kind") == "Location" else people).append((label, s))
-    if not people and not places:
-        return ""
-    text = join_labels([p for p, _ in people])
+    scene = form["scene"]
+    where, when = "", _s(scene.get("time"))
     if places:
         label, place = places[0]
         detail = _s(place.get("details")).rstrip(".")
-        if not reference:
-            label = detail or label
-            detail = ""
-        text = (text + " in " if text else "") + label + (f", {detail}" if detail else "")
-    return text[0].upper() + text[1:] + "."
+        where = (f"{label}, {detail}" if detail else label) if reference else (detail or label)
+    elif _s(scene.get("location")):
+        where = _s(scene["location"])
+    else:
+        m = re.search(r"\bset in ([^,.]+)", form["style"] or "")
+        if m:
+            where = m.group(1).strip()
+            t = re.search(r"\b((?:at|in) (?:the )?(?:dawn|dusk|night|midnight|midday|sunset|golden hour|morning|"
+                          r"early morning|afternoon|late afternoon|evening|small hours))$", where)
+            if t:
+                when, where = t.group(1), where[:t.start()].strip()
+    if not people and not where:
+        return ""
+    action = form["action"] or ""
+    speakers = len(set(re.findall(r"\(S(\d+)\)", action)))
+    many = len(people) > 1
+    if not people:
+        verb = ""
+    elif FIGHT_WORDS.search(action):
+        verb = "fight" if many else "fights"
+    elif speakers >= 2 or (many and "<d>" in action):
+        verb = "talk"
+    elif "<d>" in action:
+        verb = "speak" if many else "speaks"
+    elif where:
+        verb = "are" if many else "is"
+    else:
+        verb = "appear together" if many else "appears"
+    text = join_labels([p for p, _ in people])
+    if text:
+        text += f" {verb}"
+    if where:
+        text = (text + f" {place_preposition(where)} " if text else "") + where
+    if when:
+        text += f" {when}"
+    text = text[0].upper() + text[1:]
+    return text + "."
 
 
 def keyframe_line(mode: str, form: dict) -> str:
@@ -1037,10 +1076,23 @@ def carry_pending(shot_text: str) -> bool:
     return False
 
 
-def scene_sentence(style="", location="", time="", lighting="", atmosphere="", grade="") -> str:
+ON_PLACES = re.compile(r"\b(street|road|highway|lane|rooftop|roof|deck|platform|ridge|riverbank|bank|dock|beach|"
+                       r"shore|field|stage|bridge|motorway|pavement|sidewalk|runway|track|pier|cliff|hill|mountainside)",
+                       re.I)
+
+
+def place_preposition(where: str) -> str:
+    """"on a rain-soaked city street", "on a rooftop", but "in a dive bar"."""
+    head = re.split(r"\b(?:of|behind|above|below|by|near|with|lit|in|on|at|under|beside|overlooking)\b", where, maxsplit=1)[0]
+    words = re.findall(r"[A-Za-z-]+", head)
+    return "on" if words and ON_PLACES.fullmatch(words[-1]) else "in"   # the place's own noun decides
+
+
+def scene_sentence(style="", location="", time="", lighting="", atmosphere="", grade="", body="") -> str:
     """The 4.x builder's opening sentence: "A neo-noir scene, set in a dive bar at night, lit by neon glow, with
     drifting smoke, with a teal-and-orange grade." Every part is optional."""
-    style, location, time, lighting, atmosphere, grade = (_s(x) for x in (style, location, time, lighting, atmosphere, grade))
+    style, location, time, lighting, atmosphere, grade, body = (
+        _s(x) for x in (style, location, time, lighting, atmosphere, grade, body))
     head = f"A {style[0].lower() + style[1:]} scene" if style else "A scene"
     parts = [head]
     if location:
@@ -1053,8 +1105,12 @@ def scene_sentence(style="", location="", time="", lighting="", atmosphere="", g
         parts.append(f"with {atmosphere}")
     if grade:
         parts.append(f"with {grade}" if grade.startswith(("a ", "an ", "the ")) else f"graded with {grade}")
+    if body:
+        parts.append(f"shot on {body}")
     if len(parts) == 1:
         return f"{head}." if style else ""
+    if not style and parts[1:] == [f"shot on {body}"]:
+        return f"Shot on {body}."
     return (", ".join(parts) if style else parts[0] + " " + ", ".join(parts[1:])) + "."
 
 

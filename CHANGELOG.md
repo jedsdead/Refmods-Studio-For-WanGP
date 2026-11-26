@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.2] — 2026-11-26
+
+Prompt Builder:
+- **Draft** on Summary writes who, where and when, with the situation as far as the prompt shows it: "Glory and
+  Siren talk on a busy market street at dusk." Where comes from a Location subject, the Scene boxes or the Style
+  box; the verb comes from the action (a fight, a conversation, one speaker).
+- **Scene** is one row in Insert, above Camera, with one **Add scene** button. Style, where, when, lighting,
+  atmosphere, grade and the camera or film it's shot on make one sentence, worded for what's filled in. The Style
+  box's separate camera and lens boxes are gone; the lens belongs to the camera row.
+- The Scene boxes are saved with the prompt.
+- **Subjects** folds away: click its title. The builder remembers whether it's open.
+
 ## [0.9.1] — 2026-11-26
 
 - The Prompt Builder's right-click menu really closes now. It was being closed, but its style kept it on screen; the

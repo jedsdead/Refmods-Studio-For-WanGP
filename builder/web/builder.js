@@ -6,6 +6,8 @@
   "use strict";
   const $ = (id) => document.getElementById(id);
   const BOXES = ["summary", "style", "action", "sound", "music"];
+  const SCENE = [["scStyle", "style"], ["scLoc", "location"], ["scTime", "time"], ["scLight", "lighting"],
+                 ["scAir", "atmosphere"], ["scGrade", "grade"], ["scBody", "body"]];
   const S = {
     session: null, vocab: null, selected: 0, lastBox: "action", actionUsed: false,
     undo: {}, preview: null, timers: {}, capturedAt: 0,
@@ -99,7 +101,7 @@
     const args = {
       at: parseFloat($("at").value) || 0, move: $("camMove").value, amplitude: $("camAmp").value, speed: $("camSpeed").value,
       framing: $("camFraming").value, rig: $("camRig").value, lens: $("camLens").value, of: $("camOf").value, verb: $("camVerb").value,
-      body: $("gearBody").value,
+      body: $("scBody").value,
       index: kind === "line" ? parseInt($("dWho").value || "0", 10) : parseInt($("subjSel").value || "0", 10),
       tone: $("dTone").value, language: $("dLang").value, voiceover: $("dVo").checked, line: $("dLine").value,
       delivery: $("dAct").value, same_as: $("dSame").value, cutoff: $("dCut").checked, carry: $("dCarry").value,
@@ -110,10 +112,13 @@
     };
     if ((kind === "subject" || kind === "line") && !args.index) { status("Add a subject first."); return; }
     if (kind === "line" && !args.line.trim()) { status("Type the line first."); $("dLine").focus(); return; }
-    if (kind === "gear") args.lens = $("gearLens").value;
     const { text } = await api("snippet", { kind, form: S.form, args });
-    if (!text) { if (kind === "camera") status("Pick a framing, rig, lens, what's in frame or a move first."); return; }
-    if (kind === "gear" || kind === "scene") { addSentence("style", text); return; }
+    if (!text) {
+      if (kind === "camera") status("Pick a framing, rig, lens, what's in frame or a move first.");
+      if (kind === "scene") status("Fill in at least one of the scene's boxes first.");
+      return;
+    }
+    if (kind === "scene") { addSentence("style", text); return; }
     if (kind === "sound" || kind === "music") { addSentence(kind, text); return; }
     if (kind === "subject") insertInto(S.lastBox, text, false);
     else insertInto("action", text, !S.actionUsed);
@@ -187,6 +192,8 @@
   }
   function subjectName(s, n) { return (s.name || "").trim() || `Subject ${n}`; }
   function drawCards() {
+    const count = S.form.subjects.length;
+    $("subCount").textContent = count ? `(${count})` : "";
     const subs = S.form.subjects;
     if (!subs.length) {
       $("cards").innerHTML = '<div class="empty">No subjects yet. Press <b>+ New subject</b> to start one.</div>';
@@ -280,13 +287,14 @@
   // ---------------------------------------------------------------- the form
   function loadForm(form, note) {
     S.form = Object.assign({ mode: "Auto", duration: 10, window_duration: false, summary: "", style: "", action: "",
-                             sound: "", music: "N/A", subjects: [], off: [], ref_layout: false }, form || {});
+                             sound: "", music: "N/A", subjects: [], off: [], ref_layout: false, scene: {} }, form || {});
     S.selected = 0;
     S.tagUndo = null; $("tagUndo").hidden = true;   // an undo belongs to the prompt it was made in
     $("duration").value = S.form.duration;
     $("winDur").checked = !!S.form.window_duration;
     $("refLayout").checked = !!S.form.ref_layout;
     $("scratch").value = S.form.scratch || "";
+    for (const [id, key] of SCENE) $(id).value = (S.form.scene || {})[key] || "";
     if (S.form.scratch) $("scratchBox").open = true;
     for (const id of BOXES) $(id).value = S.form[id] || "";
     drawCards(); drawEditor(); refreshPreview();
@@ -794,6 +802,16 @@
     $("duration").addEventListener("input", () => { S.form.duration = parseFloat($("duration").value) || 10; changed(); });
     $("winDur").addEventListener("change", () => { S.form.window_duration = $("winDur").checked; changed(); });
     $("refLayout").addEventListener("change", () => { S.form.ref_layout = $("refLayout").checked; changed(); });
+    // The scene boxes are kept with the prompt, so Draft can use where and when.
+    for (const [id, key] of SCENE) $(id).addEventListener("input", () => {
+      S.form.scene = Object.assign({}, S.form.scene || {}, { [key]: $(id).value }); later("draft", saveDraft, 1500);
+    });
+    const fold = (open) => {
+      $("subBody").hidden = !open; $("subFold").setAttribute("aria-expanded", String(open));
+      try { localStorage.setItem("rs-subjects-open", open ? "1" : "0"); } catch (_) { /* no storage here */ }
+    };
+    $("subFold").addEventListener("click", () => fold($("subBody").hidden));
+    try { if (localStorage.getItem("rs-subjects-open") === "0") fold(false); } catch (_) { /* no storage here */ }
     $("btnLibrary").addEventListener("click", openLibrary);
     $("libClose").addEventListener("click", () => $("libDlg").close());
     $("libSearch").addEventListener("input", drawLibrary);
@@ -837,9 +855,9 @@
     }));
     document.querySelector('[data-draft="summary"]').addEventListener("click", async () => {
       const { text } = await api("snippet", { kind: "summary", form: S.form });
-      if (!text) { status("Add a subject first: the summary is drafted from them."); return; }
+      if (!text) { status("Add a subject or a scene location first: the summary is drafted from them."); return; }
       S.undo.summary = $("summary").value; $("summary").value = text; S.form.summary = text; changed();
-      status("Summary drafted from the subjects. Add what's happening.");
+      status("Summary drafted from the subjects, the scene and what happens. Adjust the situation if needed.");
     });
 
     // subjects

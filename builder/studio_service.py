@@ -353,7 +353,8 @@ class Service:
                                          args.get("carry", ""))
         if kind == "scene":
             return core.scene_sentence(args.get("style", ""), args.get("location", ""), args.get("time", ""),
-                                       args.get("lighting", ""), args.get("atmosphere", ""), args.get("grade", ""))
+                                       args.get("lighting", ""), args.get("atmosphere", ""), args.get("grade", ""),
+                                       args.get("body", ""))
         if kind == "sound":
             return core.sentence(args.get("text", ""))
         if kind == "music":

@@ -53,7 +53,7 @@
   <div class="left">
     <section class="card">
       <div class="card-head">
-        <span class="cap">Subjects</span>
+        <button id="subFold" class="fold" aria-expanded="true" title="Fold the subjects away to save space"><span class="arrow">▾</span> <span class="cap">Subjects</span> <span id="subCount" class="muted small"></span></button>
         <span class="muted small">Each can use pictures, mods, or just its description.</span>
         <span class="grow"></span>
         <button id="btnNewSubject" class="small">+ New subject</button>
@@ -65,8 +65,8 @@
         <button id="btnPackLoad" class="small" title="Arms the pack's mods in the Refmods panel and fills in its subject">Load pack</button>
         <button id="btnPackSave" class="small" title="Saves the selected subject (its character, mods and their roles) as a pack: into the pack picked here, or one named after the subject">Save as pack</button>
       </div>
-      <div id="cards" class="subject-grid"></div>
-      <div id="editor" class="editor"></div>
+      <div id="subBody"><div id="cards" class="subject-grid"></div>
+      <div id="editor" class="editor"></div></div>
     </section>
 
     <section class="card insert">
@@ -80,6 +80,18 @@
         <button data-snip="subject">Subject</button>
         <span class="sep"></span>
         <button id="btnPhrases" title="Wording you reuse. Select text in a box and press Ctrl+Enter to save it as one">Phrases</button>
+      </div>
+      <div class="row scene" title="One opening sentence for the Style box, worded for whatever you fill in. Every box can be typed in.">
+        <span class="cap">Scene</span>
+        <input id="scStyle" list="lsStyle" placeholder="style: neo-noir" aria-label="Style" class="cam">
+        <input id="scLoc" list="lsLoc" placeholder="where: a dive bar" aria-label="Location" class="cam">
+        <input id="scTime" list="lsTime" placeholder="when: at night" aria-label="Time of day" class="cam">
+        <input id="scLight" list="lsLight" placeholder="lit by: neon glow" aria-label="Lighting" class="cam">
+        <input id="scAir" list="lsAir" placeholder="air: light mist" aria-label="Atmosphere" class="cam">
+        <input id="scGrade" list="lsGrade" placeholder="grade" aria-label="Colour grade" class="cam">
+        <input id="scBody" list="lsBody" placeholder="shot on: 35mm film" aria-label="Camera or film" class="cam">
+        <button data-snip="scene" class="primary">Add scene</button>
+        <datalist id="lsStyle"></datalist><datalist id="lsLoc"></datalist><datalist id="lsTime"></datalist><datalist id="lsLight"></datalist><datalist id="lsAir"></datalist><datalist id="lsGrade"></datalist><datalist id="lsBody"></datalist>
       </div>
       <div class="row camera" title="Framing and rig make one shot: a medium crane shot. Every box can be typed in.">
         <span class="cap">Camera</span>
@@ -117,7 +129,7 @@
         <input id="txWords" placeholder="the words, exactly: OPEN ALL NIGHT" aria-label="Visible text" class="grow">
         <button data-snip="text">Insert text</button><datalist id="lsTextKind"></datalist>
       </div>
-      <div class="muted small">Time, Shot, Camera and lines go into Action at its cursor; the camera's Auto verb cuts at a new shot and moves within one. Subject and labels go into the box you last clicked. Type <b>!Name</b> for a subject (Tab completes it). Right-click a tag to swap or remove it.</div>
+      <div class="muted small">Scene goes into Style. Time, Shot, Camera and lines go into Action at its cursor; the camera's Auto verb cuts at a new shot and moves within one. Subject and labels go into the box you last clicked. Type <b>!Name</b> for a subject (Tab completes it). Right-click a tag to swap or remove it.</div>
     </section>
 
     <section class="field">
@@ -127,19 +139,7 @@
     </section>
     <section class="field">
       <div class="field-head"><label for="style">Style</label><span class="muted small">stays the same for the whole clip</span><span class="grow"></span>
-        <input id="gearBody" list="lsBody" placeholder="shot on: an Arri Alexa…" aria-label="Camera or film" class="cam" style="width:190px">
-        <input id="gearLens" list="lsLens" placeholder="using: a 35mm lens" aria-label="Lens" class="cam" style="width:170px">
-        <button class="small" data-snip="gear">Add</button><datalist id="lsBody"></datalist></div>
-      <div class="row presets" title="One opening sentence: style, where, when, light, air and grade. Every box can be typed in.">
-        <input id="scStyle" list="lsStyle" placeholder="style" aria-label="Style" class="cam">
-        <input id="scLoc" list="lsLoc" placeholder="where" aria-label="Location" class="cam">
-        <input id="scTime" list="lsTime" placeholder="when" aria-label="Time of day" class="cam">
-        <input id="scLight" list="lsLight" placeholder="lit by" aria-label="Lighting" class="cam">
-        <input id="scAir" list="lsAir" placeholder="air: light mist" aria-label="Atmosphere" class="cam">
-        <input id="scGrade" list="lsGrade" placeholder="grade" aria-label="Colour grade" class="cam">
-        <button class="small" data-snip="scene">Add scene</button>
-        <datalist id="lsStyle"></datalist><datalist id="lsLoc"></datalist><datalist id="lsTime"></datalist><datalist id="lsLight"></datalist><datalist id="lsAir"></datalist><datalist id="lsGrade"></datalist>
-      </div>
+<span class="muted small">Insert → Scene writes its opening sentence here</span></div>
       <textarea id="style" rows="1" class="box" placeholder="Live-action, cinematic, 35mm, teal and amber grade, night"></textarea>
     </section>
     <section class="field">
