@@ -31,7 +31,7 @@ import gradio as gr
 from shared.utils.plugins import WAN2GPPlugin
 
 PLUGIN_NAME = "Refmods Studio"
-PLUGIN_VERSION = "0.8.1"
+PLUGIN_VERSION = "0.8.2"
 
 # Kept on this module so other plugins that look for Refmods by these names
 # still find it here: 2 Phases Plus checks the plugin module of an enabled
@@ -303,7 +303,7 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
 
     def setup_ui(self):
         if self._rs_blocked:
-            self.add_tab(tab_id="refmods_studio_blocked", label=PLUGIN_NAME,
+            self.add_tab(tab_id="refmods_studio", label=PLUGIN_NAME,
                          component_constructor=self._rs_blocked_ui)
             return
 
@@ -321,7 +321,7 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
             self.add_tab(tab_id="refmods_studio", label=PLUGIN_NAME, component_constructor=self._rs_studio_ui)
 
         if not self._rs_halves:
-            self.add_tab(tab_id="refmods_studio_settings", label=PLUGIN_NAME,
+            self.add_tab(tab_id="refmods_studio", label=PLUGIN_NAME,
                          component_constructor=self._rs_settings_ui)
 
     def _rs_gather(self, half, plugin):

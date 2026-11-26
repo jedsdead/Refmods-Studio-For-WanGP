@@ -251,6 +251,7 @@ class Service:
     def snippet(self, kind, form, args):
         form = core.clean_form(form)
         media, _, mode, _ = self.resolve(form)
+        form = core.expand_names(form, mode)   # typed !Name counts, e.g. for who already has a speaker ID
         args = args or {}
         if kind == "time":
             return f"At {core.timestamp(args.get('at'))}, "
@@ -512,6 +513,7 @@ class Service:
         think = bool(payload.get("think"))
         studio = self._studio()
         media, _, mode, _ = self.resolve(form)
+        form = core.expand_names(form, mode)   # the enhancer sees the subjects, not !Name
         current = _s(form.get(part))
         context = self.context(form, media, mode)
         from .h3studio.modes import ACTION_ROLE, Target, detect_combat
@@ -573,6 +575,7 @@ class Service:
         think = bool(payload.get("think"))
         studio = self._studio()
         media, _, mode, _ = self.resolve(form)
+        form = core.expand_names(form, mode)
         family = "ref2va" if mode == "Reference" else "fl2va"
         request = idea or _s(form["action"])
         if not request:

@@ -145,7 +145,7 @@ def clean_form(data) -> dict:
         form["mode"] = AUTO
     form["window_duration"] = bool(form["window_duration"])
     form["off"] = [x for x in (form["off"] or []) if x in SWITCHABLE]
-    return expand_names(form)
+    return form
 
 
 # -- !Name shorthand -----------------------------------------------------------------
@@ -157,9 +157,12 @@ def name_tag(subjects: list, index: int) -> str:
     return f"<Subject {index}>"
 
 
-def expand_names(form: dict) -> dict:
-    """!Jodi (or !Jodi Maren) anywhere in the writing boxes becomes that subject's tag. Matches the full name or,
-    when it's unique, the first word of it; case doesn't matter. Unknown names are left as typed."""
+def expand_names(form: dict, mode: str = "Reference") -> dict:
+    """!Jodi (or !Jodi Maren) anywhere in the writing boxes becomes that subject: its tag in Reference mode, and
+    its name in the base modes, which have no subject labels. Matches the full name or, when it's unique, the
+    first word of it; case doesn't matter. Unknown names are left as typed. Only the assembled prompt changes:
+    the boxes, drafts and saved prompts keep what you typed."""
+    form = dict(form)
     names = []
     firsts = {}
     for n, subject in enumerate(form.get("subjects") or [], 1):
@@ -178,8 +181,15 @@ def expand_names(form: dict) -> dict:
     for box in ("summary", "style", "action", "sound", "music"):
         text = form.get(box) or ""
         if NAME_MARK in text:
-            form[box] = pattern.sub(lambda m: f"<Subject {lookup[m.group(1).lower()]}>", text)
+            form[box] = pattern.sub(lambda m: _named(form["subjects"], lookup[m.group(1).lower()], mode), text)
     return form
+
+
+def _named(subjects: list, index: int, mode: str) -> str:
+    if mode == "Reference":
+        return f"<Subject {index}>"
+    subject = subjects[index - 1]
+    return _s(subject.get("name")) or f"the {gender_noun(subject)}"
 
 
 # -- what the generation sends -----------------------------------------------------
@@ -771,7 +781,7 @@ def duration_command(form: dict) -> str:
 
 
 def assemble(form: dict, media: list[Media], mode: str) -> str:
-    text = _assemble(clean_form(form), media, mode)
+    text = _assemble(expand_names(clean_form(form), mode), media, mode)
     command = duration_command(clean_form(form))
     return f"{command}\n{text}" if command else text
 
@@ -813,7 +823,7 @@ def checks(form: dict, media: list[Media], mode: str, text: str, detected: str, 
            lint_check=None) -> dict:
     """{"errors": [...], "warnings": [...], "info": [...]}: what is wrong,
     what is worth a look, and the counts against H3's limits."""
-    form = clean_form(form)
+    form = expand_names(clean_form(form), mode)
     errors, warnings, info = [], [], []
     by_kind = {k: [m for m in media if m.kind == k] for k in ("picture", "video", "audio")}
     sent = {label for m in media for label in m.labels}

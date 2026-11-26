@@ -198,14 +198,31 @@ def delete_pack(name: str) -> bool:
 
 
 def import_presets_as_packs() -> int:
-    """Each saved preset becomes a "mixed" pack, once. Returns how many."""
-    marker = os.path.join(packs_dir(), ".presets_imported")
-    if os.path.exists(marker):
+    """Each saved preset becomes a "mixed" pack. Checked every time packs are listed, so presets saved later in
+    Refmods For Wan GP come across too. A preset is converted once: the names done are kept in
+    packs/.presets_imported, so a pack you delete doesn't come back, and an existing pack is never overwritten.
+    presets.json itself is left as it is. Returns how many were converted."""
+    presets = read_presets()
+    if not presets:
         return 0
-    count = 0
-    for name, preset in read_presets().items():
+    marker = os.path.join(packs_dir(), ".presets_imported")
+    done = {}
+    if os.path.exists(marker):
+        try:
+            with open(marker, encoding="utf-8") as handle:
+                data = json.load(handle)
+            done = data if isinstance(data, dict) else {}
+        except (OSError, ValueError):
+            # The first version wrote a date here and imported everything at once: count what was there then.
+            done = {name: "" for name in presets if os.path.exists(_pack_file(name))}
+    count, changed = 0, False
+    for name, preset in presets.items():
+        if name in done:
+            continue
+        changed = True
         try:
             if os.path.exists(_pack_file(name)):
+                done[name] = "pack existed"
                 continue
             settings = {k: v for k, v in preset.items() if k not in ("rows", "saved")}
             pack = {"name": name, "kind": "mixed", "from_preset": True,
@@ -213,14 +230,16 @@ def import_presets_as_packs() -> int:
             if settings:
                 pack["settings"] = settings
             write_pack(pack)
+            done[name] = time.strftime("%Y-%m-%d %H:%M")
             count += 1
         except Exception as e:
             print(f"[Refmods] could not turn preset '{name}' into a pack ({e!r})")
-    try:
-        with open(marker, "w", encoding="utf-8") as handle:
-            handle.write(time.strftime("%Y-%m-%d %H:%M"))
-    except OSError:
-        pass
+    if changed or not os.path.exists(marker):
+        try:
+            with open(marker, "w", encoding="utf-8") as handle:
+                json.dump(done, handle, indent=1)
+        except OSError:
+            pass
     if count:
         print(f"[Refmods] {count} preset(s) are now packs; presets.json is kept as it was")
     return count

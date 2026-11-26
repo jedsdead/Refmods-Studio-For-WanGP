@@ -260,6 +260,7 @@
     S.form = Object.assign({ mode: "Auto", duration: 10, window_duration: false, summary: "", style: "", action: "",
                              sound: "", music: "N/A", subjects: [], off: [] }, form || {});
     S.selected = 0;
+    S.tagUndo = null; $("tagUndo").hidden = true;   // an undo belongs to the prompt it was made in
     $("duration").value = S.form.duration;
     $("winDur").checked = !!S.form.window_duration;
     for (const id of BOXES) $(id).value = S.form[id] || "";
@@ -589,7 +590,7 @@
     paint();
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && !e.defaultPrevented && button && document.documentElement.classList.contains("rs-full") &&
-          !document.querySelector("dialog[open]")) button.click();
+          !document.querySelector("dialog[open]") && $("ctx").hidden && $("suggest").hidden) button.click();
     });
     $("subSwitch").querySelectorAll("button[data-sub]").forEach((b) => b.addEventListener("click", () => {
       const tab = [...pdoc.querySelectorAll(".rs-studio-tabs button[role=tab]")].find((t) => t.textContent.trim() === b.dataset.sub);

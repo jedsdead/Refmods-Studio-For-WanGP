@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.8.2] — 2026-11-26
+
+- **Presets keep coming across.** Packs are checked against `presets.json` every time they're listed, so presets saved
+  later in Refmods For Wan GP become packs too. The converted ones are remembered, so a pack you delete doesn't come
+  back, and an existing pack is never overwritten.
+- Fixes from a check across the plugin:
+  - `!Name` in T2VA, I2VA, FL2VA and L2VA now becomes the subject's name. Those modes have no subject labels, so
+    `<Subject N>` was wrong there.
+  - `!Name` is now only expanded in the finished prompt. Drafts and saved prompts used to swap your typed `!Name` for
+    tags.
+  - The enhancer, and the speaker IDs for the next line, read `!Name` as the subject it names.
+  - With the old plugins enabled, or both halves turned off, Refmods Studio could fail to load since it declared full
+    screen. Its tab id is the same in every case now.
+  - Esc in the Prompt Builder closes the tag menu or the name suggestions before it leaves full screen.
+  - The tag Undo is cleared when another prompt is loaded, so it can't bring back the old one.
+
 ## [0.8.1] — 2026-11-26
 
 Prompt Builder:
