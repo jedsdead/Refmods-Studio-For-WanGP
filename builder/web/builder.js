@@ -307,9 +307,9 @@
       $("preview").innerHTML = highlight(out.text);
       hlAll();
       drawSections();
-      $("detected").textContent = `Picked from the Generator page: ${out.summary} → ${out.detected}` +
-        (S.form.mode !== "Auto" ? ` · writing ${out.mode}` : "");
       drawModes(out.detected);
+      // What was read from the Generator page, as a hover on the mode buttons rather than a line of its own.
+      $("modes").title = `From the Generator page: ${out.summary} → ${out.detected}` + (out.mode !== out.detected ? ` · writing ${out.mode}` : "");
       const base = S.form.mode === "Auto" ? out.detected : S.form.mode;
       $("refLayoutBox").hidden = base === "Reference";
       drawChips(out.unused);

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.0] — 2026-11-26
+
+First release of Refmods Studio: Refmods and the MiniMax H3 Prompt Builder in one plugin, both as web apps in one
+tab with a full-screen mode. The entries below are the changes on the way here.
+
+- The Prompt Builder's header stays on one line. What it read from the Generator page is now the hover on the mode
+  buttons.
+- The video-mod setting for later windows no longer calls "First frame as a still" recommended.
+
 ## [0.9.2] — 2026-11-26
 
 Prompt Builder:

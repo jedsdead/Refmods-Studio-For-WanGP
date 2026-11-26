@@ -71,7 +71,7 @@ NONE_CHOICE = "(none)"
 # choice. The values are what travels in the serialized state; see
 # patches.WINDOW_MODE_* for what each one does at injection time.
 WINDOW_MODE_CHOICES = [
-    ("First frame as a still (recommended)", "still"),
+    ("First frame as a still", "still"),
     ("Whole clip, like a live reference video", "full"),
     ("Not at all (first window only)", "first"),
 ]

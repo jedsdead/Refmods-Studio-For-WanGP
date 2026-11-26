@@ -151,3 +151,8 @@ dialog::backdrop { background: rgba(0, 0, 0, .5); }
 .fold { background: none; border: 0; padding: 0; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .fold .arrow { display: inline-block; transition: transform .15s; color: var(--muted); }
 .fold[aria-expanded="false"] .arrow { transform: rotate(-90deg); }
+/* The header stays on one line: mode, length, [/duration], subject sections and full screen, spaced across. */
+header.bar { flex-wrap: nowrap; white-space: nowrap; gap: 14px; }
+header.bar > * { flex-shrink: 0; }
+header.bar .grow { flex: 1 1 0; min-width: 0; }
+header.bar .modes button { padding-left: 8px; padding-right: 8px; }

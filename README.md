@@ -91,7 +91,8 @@ creating, decoding, strength previews, encoder frames and soundtracks.
 
 ## Installing
 
-1. Put the `Wan2GP-Refmods-Studio` folder in WanGP's `plugins` folder.
+1. In WanGP's **Plugin Manager**, install from `https://github.com/jedsdead/Refmods-Studio-For-WanGP`, or download
+   the release and put its folder in WanGP's `plugins` folder.
 2. In **Plugin Manager**, disable **Refmods For Wan GP** and **MiniMax H3 Prompt Builder** if you have them, and
    enable **Refmods Studio**.
 3. Restart WanGP.
