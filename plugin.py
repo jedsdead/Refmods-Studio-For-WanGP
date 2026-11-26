@@ -255,6 +255,7 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
             try:
                 module, plugin = _load_half(half)
                 self._rs_halves[half] = plugin
+                plugin._studio = self           # the pages' Settings read and save through the host
                 if half == "refmods":
                     globals()["MiniMaxH3RefModsPlugin"] = _ClassRef(
                         module.MiniMaxH3RefModsPlugin)
@@ -362,11 +363,11 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
         # In full screen the frame covers the page, but the subtab bar's blue underline (Gradio gives it a z-index)
         # was drawn on top of it. The frame goes above everything in the full-screen layer, and the bar is hidden
         # there (the pages' own Refmods / Prompt Builder switch still clicks it).
-        gr.HTML("<style>.rs-studio-tabs .wangp-addon-web-view iframe { height: calc(100vh - 205px) !important; }"
+        gr.HTML("<style>.rs-studio-tabs .wangp-addon-web-view iframe { height: calc(100vh - 160px) !important; }"
                 ".wangp-addon-fullscreen .rs-studio-tabs .wangp-addon-web-view iframe { z-index: 10; }"
                 ".wangp-addon-fullscreen .rs-studio-tabs > .tab-wrapper { visibility: hidden; }</style>",
                 padding=False)
-        self._rs_settings_ui(folded=True)
+        # The settings are in the pages now (Refmods → Setup, and Settings in the Prompt Builder's header).
         with gr.Tabs(elem_classes="rs-studio-tabs"):
             for label, constructor, half in self._rs_subtabs:
                 with gr.Tab(label):
@@ -445,6 +446,17 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
             status = gr.Markdown("")
         save.click(fn=self._rs_save_settings,
                    inputs=[show_refmods, show_builder], outputs=[status])
+
+    def studio_settings(self):
+        """What the pages' Settings show: which halves are on, and anything that didn't load."""
+        settings = read_settings()
+        return {"version": PLUGIN_VERSION, "refmods": half_enabled(settings, "refmods"),
+                "builder": half_enabled(settings, "builder"), "path": str(_settings_path()),
+                "problems": [f"{HALF_LABELS[h]} {msg}" for h, msg in self._rs_errors.items()]}
+
+    def save_studio_settings(self, refmods, builder):
+        note = self._rs_save_settings(refmods, builder)
+        return {"ok": not note.startswith("Could not"), "note": note.replace("`", "")}
 
     @staticmethod
     def _rs_save_settings(show_refmods, show_builder):

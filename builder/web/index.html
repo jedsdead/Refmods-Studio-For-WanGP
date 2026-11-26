@@ -17,6 +17,7 @@
   <label class="inline" title="Open the prompt with [/duration=…s], this sliding window's length"><input id="winDur" type="checkbox"> [/duration]</label>
   <label class="inline" id="refLayoutBox" title="Write a base mode (FL2VA, I2VA…) with subject definitions, retention and the other reference sections, as the H3 guide asks for RefMods in FL2VA. Names become subject tags."><input id="refLayout" type="checkbox"> Subject sections</label>
   <div class="modes subswitch" id="subSwitch" title="Switch page"><button data-sub="Refmods">Refmods</button><button data-sub="Prompt Builder" class="on">Prompt Builder</button></div>
+  <button id="btnSettings" class="small" title="Refmods Studio settings">Settings</button>
   <span id="fsBox" class="fsbox"></span>
 </header>
 
@@ -195,6 +196,14 @@
   <div class="row phsave"><textarea id="phText" rows="2" placeholder="A phrase to save: select text in a box and press Ctrl+Enter, or type it here"></textarea></div>
   <div class="row"><input id="phNewCat" placeholder="Category" list="phCats" class="num" style="width:160px"><datalist id="phCats"></datalist>
     <button id="phSave" class="primary">Save phrase</button><span class="muted small">Click a phrase to insert it where you were typing.</span><span class="grow"></span><button id="phClose">Close</button></div>
+</div></dialog>
+<dialog id="setDlg"><div class="dlg">
+  <div class="row"><h2 id="setTitle">Refmods Studio</h2></div>
+  <p class="muted small">Turn either half off to hide it completely. A half that's off isn't loaded at all, so turning off Refmods also removes its pipeline hooks. Restart WanGP after saving.</p>
+  <div id="setProblems" class="checks"></div>
+  <div class="row"><label class="inline"><input type="checkbox" id="setRefmods"> Refmods</label>
+    <label class="inline"><input type="checkbox" id="setBuilder"> Prompt Builder</label>
+    <button id="setSave" class="primary">Save</button><span id="setNote" class="muted small"></span><span class="grow"></span><button id="setClose">Close</button></div>
 </div></dialog>
 <dialog id="libDlg"><div class="dlg">
   <div class="row"><h2>Prompt library</h2><span class="grow"></span><input id="libSearch" type="search" placeholder="Search" aria-label="Search prompts"><select id="libCat" aria-label="Category"></select>

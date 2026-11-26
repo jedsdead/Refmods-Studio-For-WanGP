@@ -812,6 +812,20 @@
     };
     $("subFold").addEventListener("click", () => fold($("subBody").hidden));
     try { if (localStorage.getItem("rs-subjects-open") === "0") fold(false); } catch (_) { /* no storage here */ }
+    $("btnSettings").addEventListener("click", async () => {
+      let st;
+      try { st = await api("studio_settings"); } catch (err) { status(err.message); return; }
+      if (st.missing) { status("The settings can't be reached from here."); return; }
+      $("setTitle").textContent = "Refmods Studio " + st.version;
+      $("setRefmods").checked = !!st.refmods; $("setBuilder").checked = !!st.builder; $("setNote").textContent = "";
+      $("setProblems").innerHTML = (st.problems || []).map((p) => `<li class="e">Not loaded this session: ${esc(p)}</li>`).join("");
+      $("setDlg").showModal();
+    });
+    $("setSave").addEventListener("click", async () => {
+      const r = await api("studio_settings", { refmods: $("setRefmods").checked, builder: $("setBuilder").checked });
+      $("setNote").textContent = r.note || "";
+    });
+    $("setClose").addEventListener("click", () => $("setDlg").close());
     $("btnLibrary").addEventListener("click", openLibrary);
     $("libClose").addEventListener("click", () => $("libDlg").close());
     $("libSearch").addEventListener("input", drawLibrary);

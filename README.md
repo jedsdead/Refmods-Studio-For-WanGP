@@ -113,8 +113,9 @@ Nothing needs moving:
 
 ## Settings
 
-The Refmods Studio tab has a **Refmods Studio settings** fold at the top. Untick **Refmods** or **Prompt Builder** to hide that
-half completely, then restart WanGP. A half that's off isn't loaded at all: turning off Refmods also removes its
+The settings are on the Refmods **Setup** page and behind **Settings** in the Prompt Builder's header. Untick
+**Refmods** or **Prompt Builder** to hide that half completely, then restart WanGP. With both off, the tab shows
+just these settings. A half that's off isn't loaded at all: turning off Refmods also removes its
 pipeline hooks.
 
 ## Credits
