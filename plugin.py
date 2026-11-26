@@ -360,7 +360,12 @@ class RefmodsStudioPlugin(WAN2GPPlugin):
         """The Refmods Studio tab: the settings fold, then a subtab per half (Refmods, Prompt Builder)."""
         # Each page shows WanGP's Full Screen button in its own header (see the pages' fullscreen code),
         # so WanGP hides its bar; the frames make room for the settings fold and the subtab bar.
-        gr.HTML("<style>.rs-studio-tabs .wangp-addon-web-view iframe { height: calc(100vh - 205px) !important; }</style>",
+        # In full screen the frame covers the page, but the subtab bar's blue underline (Gradio gives it a z-index)
+        # was drawn on top of it. The frame goes above everything in the full-screen layer, and the bar is hidden
+        # there (the pages' own Refmods / Prompt Builder switch still clicks it).
+        gr.HTML("<style>.rs-studio-tabs .wangp-addon-web-view iframe { height: calc(100vh - 205px) !important; }"
+                ".wangp-addon-fullscreen .rs-studio-tabs .wangp-addon-web-view iframe { z-index: 10; }"
+                ".wangp-addon-fullscreen .rs-studio-tabs > .tab-wrapper { visibility: hidden; }</style>",
                 padding=False)
         self._rs_settings_ui(folded=True)
         with gr.Tabs(elem_classes="rs-studio-tabs"):

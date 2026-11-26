@@ -8,6 +8,7 @@ tab with a full-screen mode. The entries below are the changes on the way here.
 - The Prompt Builder's header stays on one line. What it read from the Generator page is now the hover on the mode
   buttons.
 - The video-mod setting for later windows no longer calls "First frame as a still" recommended.
+- In full screen, the subtab bar's blue underline no longer shows through on top of the page.
 
 ## [0.9.2] — 2026-11-26
 
