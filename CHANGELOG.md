@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.8.0] — 2026-11-26
+
+Prompt Builder:
+- **Tag menu.** Right-click a tag (`<Subject N>`, `<Picture N>`, `<Video N>`, `<Audio N>` or a speaker ID) in a writing
+  box to swap it with another or remove it: here, in this box, or everywhere.
+  - A subject swapped everywhere takes its subject with it, and one removed everywhere goes from the list, with the
+    later subjects moving up.
+  - Removing a picture's tag everywhere also takes it off any subject that uses it, so its definition and retention
+    lines go.
+  - **Undo**, beside the status line, puts it all back.
+- Moving or removing a subject card now renumbers its tags in the text too.
+- **!Name.** Type `!Jodi` (or `!Jodi Maren`) for a subject; it becomes its tag in the prompt. Tab completes the name.
+  A name nobody has is left as typed, with a warning.
+- **Phrases**: wording you reuse, with categories and search. Select text and press Ctrl+Enter (or right-click, Save
+  as phrase) to keep it; **Phrases** inserts one where you were typing. Kept in `loras/h3_prompt_builder/phrases.json`.
+- **Switches.** Each section of the prompt can be switched off above the preview without deleting it, and each
+  subject's definition line and retention rows in the subject editor.
+- With text selected, right-click also offers Copy, Cut and Remove. Shift+right-click gives the browser's menu.
+
+Refmods:
+- **Trim editor:**
+  - zoom with − and +, Fit, or the mouse wheel;
+  - ← → step a frame (Shift: 10 frames), `[` `]` set in and out, and Home/End jump to them;
+  - M mutes, and the readout shows the time from the in point.
+- **Use frame** (C) adds the frame at the playhead as a picture, and **Use audio** (A) adds the kept range as an audio
+  file. Both are on the Create page.
+- **Rotate** and **Mirror** in the crop editor.
+- Create won't make a mod that's over **Max tokens**. It used to drop pictures to fit; now it says what to change.
+
 ## [0.7.1] — 2026-11-26
 
 - **Full screen**, WanGP's own, as the Video Editor uses it. The button sits at the right of each page's header

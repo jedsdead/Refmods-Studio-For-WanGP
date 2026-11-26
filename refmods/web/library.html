@@ -172,20 +172,26 @@
   <div class="row"><b>Crop</b><span class="grow"></span>
     <div class="seg" id="cropAspect"><button data-r="0" class="on">Free</button><button data-r="1">1:1</button><button data-r="0.75">3:4</button><button data-r="1.3333">4:3</button><button data-r="0.5625">9:16</button><button data-r="1.7778">16:9</button></div></div>
   <div class="cropstage" id="cropStage"><img id="cropImg" alt=""><div class="cropbox" id="cropBox"><span class="h nw"></span><span class="h ne"></span><span class="h sw"></span><span class="h se"></span></div></div>
-  <div class="row"><span class="muted small" id="cropInfo"></span><span class="grow"></span><button id="cropCancel">Cancel</button><button id="cropReset">Whole picture</button><button id="cropOk" class="primary">Crop</button></div>
+  <div class="row"><button id="cropRotate" title="Turn it a quarter turn clockwise">Rotate</button><button id="cropMirror" title="Flip it left to right">Mirror</button>
+    <span class="muted small" id="cropInfo"></span><span class="grow"></span><button id="cropCancel">Cancel</button><button id="cropReset">Whole picture</button><button id="cropOk" class="primary">Crop</button></div>
 </div></dialog>
 <dialog id="trimDlg"><div class="dlg">
   <div class="row"><b id="trimTitle">Trim</b><span class="grow"></span><span class="muted small" id="trimInfo"></span></div>
   <div class="trimmedia" id="trimMedia"></div>
-  <div class="tl" id="trimTl" title="Click or drag to scrub; drag the handles to set the in and out points">
+  <div class="tl" id="trimTl" title="Click or drag to scrub; drag the handles to set the in and out points; scroll to zoom">
     <canvas id="trimWave"></canvas><div class="tl-sel" id="trimSel"></div>
     <div class="tl-h" id="trimIn" title="In point"></div><div class="tl-h" id="trimOut" title="Out point"></div><div class="tl-play" id="trimHead"></div>
   </div>
-  <div class="row small muted"><span id="trimNow">0.0 s</span><span class="grow"></span><span>Space plays · I sets in · O sets out</span></div>
+  <div class="row small muted"><span id="trimNow">0.0 s</span><span class="grow"></span>
+    <span>Space plays · ← → step a frame (Shift: 10) · [ ] or I O set in and out · Home/End jump to them · − + zoom · M mutes</span></div>
   <div class="row"><button id="trimPP">Play</button><button id="trimPlaySel">Play the selection</button>
     <button id="trimSetIn">Set in</button><button id="trimSetOut">Set out</button>
     <label class="inline">In <input type="number" id="trimA" class="num" step="0.1" min="0"></label>
     <label class="inline">Out <input type="number" id="trimB" class="num" step="0.1" min="0"></label>
+    <span class="seg"><button id="trimZoomOut" title="Zoom out (−)">−</button><button id="trimFit" title="Show it all">Fit</button><button id="trimZoomIn" title="Zoom in (+)">+</button></span>
+    <button id="trimMute" title="Mute (M)">Mute</button>
+    <button id="trimFrame" title="Add this frame as a picture (C)" hidden>Use frame</button>
+    <button id="trimAudio" title="Add the kept range as an audio file (A)" hidden>Use audio</button>
     <span class="grow"></span><button id="trimCancel">Cancel</button><button id="trimOk" class="primary">Done</button></div>
 </div></dialog>
 <dialog id="packDlg"><div class="dlg">

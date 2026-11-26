@@ -61,61 +61,90 @@
   };
 
   // ---------------------------------------------------------------- the trim editor (videos and sound)
-  // RS.trim({src, kind: "video"|"audio", title, start, end, min}) -> Promise<{start, end} | null>
+  // RS.trim({src, kind: "video"|"audio", title, start, end, min, duration, onFrame(blob, t), onAudio(start, end)})
+  //   -> Promise<{start, end} | null>
+  const FRAME = 1 / 24;
   RS.trim = function (opts) {
     return new Promise((resolve) => {
       const dlg = $("trimDlg"), box = $("trimMedia"), tl = $("trimTl"), canvas = $("trimWave");
       const media = document.createElement(opts.kind === "video" ? "video" : "audio");
-      media.src = opts.src; media.preload = "auto"; media.playsInline = true;
+      media.src = opts.src; media.preload = "auto"; media.playsInline = true; media.crossOrigin = "anonymous";
       box.innerHTML = ""; box.appendChild(media);
       $("trimTitle").textContent = opts.title || "Trim";
+      $("trimFrame").hidden = !(opts.kind === "video" && opts.onFrame);
+      $("trimAudio").hidden = !opts.onAudio;
       const min = opts.min || 0.1;
       let dur = 0, a = +opts.start || 0, b = +opts.end || 0, stopAt = null, raf = 0, drag = null, done = false;
+      let view = { from: 0, to: 1 }, peaks = null;
       const fmt = (t) => (Math.round(t * 10) / 10).toFixed(1) + " s";
-      const pct = (t) => (dur ? (t / dur) * 100 : 0) + "%";
+      const span = () => Math.max(0.001, view.to - view.from);
+      const pct = (t) => ((t - view.from) / span()) * 100 + "%";
+      const drawWave = () => {
+        const ctx2 = canvas.getContext("2d"), w = canvas.width = tl.clientWidth * 2, h = canvas.height = tl.clientHeight * 2;
+        ctx2.clearRect(0, 0, w, h);
+        if (!peaks || !dur) return;
+        ctx2.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--muted") || "#9ca3af";
+        for (let x = 0; x < w; x++) {
+          const t0 = view.from + (x / w) * span(), t1 = view.from + ((x + 1) / w) * span();
+          const i0 = Math.floor((t0 / dur) * peaks.length), i1 = Math.max(i0 + 1, Math.ceil((t1 / dur) * peaks.length));
+          let peak = 0;
+          for (let i = i0; i < i1 && i < peaks.length; i++) peak = Math.max(peak, peaks[i]);
+          const bar = Math.max(1, peak * h * 0.9);
+          ctx2.fillRect(x, (h - bar) / 2, 1, bar);
+        }
+      };
       const draw = () => {
-        $("trimSel").style.left = pct(a); $("trimSel").style.width = (dur ? ((b - a) / dur) * 100 : 0) + "%";
+        const now = media.currentTime || 0;
+        $("trimSel").style.left = pct(a); $("trimSel").style.width = ((b - a) / span()) * 100 + "%";
         $("trimIn").style.left = pct(a); $("trimOut").style.left = pct(b);
-        $("trimHead").style.left = pct(media.currentTime || 0);
-        $("trimNow").textContent = fmt(media.currentTime || 0) + " of " + fmt(dur);
+        $("trimHead").style.left = pct(now);
+        $("trimNow").textContent = `${fmt(now)} of ${fmt(dur)} · ${now >= a ? "+" : "−"}${fmt(Math.abs(now - a))} from the in point` +
+          (span() < dur - 0.01 ? ` · showing ${fmt(view.from)}–${fmt(view.to)}` : "");
         $("trimInfo").textContent = `Keeping ${fmt(a)} to ${fmt(b)} (${fmt(b - a)})`;
-        if (document.activeElement !== $("trimA")) $("trimA").value = a.toFixed(1);
-        if (document.activeElement !== $("trimB")) $("trimB").value = b.toFixed(1);
+        if (document.activeElement !== $("trimA")) $("trimA").value = a.toFixed(2);
+        if (document.activeElement !== $("trimB")) $("trimB").value = b.toFixed(2);
         $("trimPP").textContent = media.paused ? "Play" : "Pause";
+        $("trimMute").textContent = media.muted ? "Unmute" : "Mute";
         $("trimOk").disabled = b - a < min - 0.001;
+      };
+      const follow = () => {   // keep the playhead in view while zoomed
+        const t = media.currentTime || 0;
+        if (t < view.from || t > view.to) { const w = span(); view.from = Math.max(0, Math.min(dur - w, t - w * 0.1)); view.to = view.from + w; drawWave(); }
       };
       const tick = () => {
         if (stopAt != null && media.currentTime >= stopAt) { media.pause(); stopAt = null; }
-        draw();
+        follow(); draw();
         if (!media.paused) raf = requestAnimationFrame(tick);
       };
-      const timeAt = (e) => { const r = tl.getBoundingClientRect(); return Math.max(0, Math.min(dur, ((e.clientX - r.left) / r.width) * dur)); };
+      const zoom = (factor, around) => {
+        if (!dur) return;
+        const w = Math.max(Math.min(dur, 0.5), Math.min(dur, span() * factor));
+        const c = around != null ? around : (media.currentTime || (view.from + view.to) / 2);
+        const rel = (c - view.from) / span();
+        view.from = Math.max(0, Math.min(dur - w, c - rel * w)); view.to = view.from + w;
+        drawWave(); draw();
+      };
+      const timeAt = (e) => { const r = tl.getBoundingClientRect(); return Math.max(0, Math.min(dur, view.from + ((e.clientX - r.left) / r.width) * span())); };
+      const seek = (t) => { media.currentTime = Math.max(0, Math.min(dur, t)); follow(); draw(); };
       const setA = (t) => { a = Math.max(0, Math.min(t, b - min)); draw(); };
       const setB = (t) => { b = Math.min(dur, Math.max(t, a + min)); draw(); };
       media.addEventListener("loadedmetadata", () => {
         dur = media.duration && isFinite(media.duration) ? media.duration : (+opts.duration || 0);
         if (!b || b > dur) b = dur;
         a = Math.min(a, Math.max(0, b - min));
+        view = { from: 0, to: dur };
         media.currentTime = a;
-        draw();
+        drawWave(); draw();
       });
       media.addEventListener("play", () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); });
       media.addEventListener("pause", draw);
       media.addEventListener("seeked", draw);
-      // A waveform for sound, so you can see where the words are.
-      const ctx2 = canvas.getContext("2d");
-      ctx2.clearRect(0, 0, canvas.width, canvas.height);
-      if (opts.kind !== "video") {
+      if (opts.kind !== "video") {   // a waveform for sound, so you can see where the words are
         fetch(opts.src).then((r) => r.arrayBuffer()).then((buf) => new (window.AudioContext || window.webkitAudioContext)().decodeAudioData(buf)).then((audio) => {
-          const w = canvas.width = tl.clientWidth * 2, h = canvas.height = tl.clientHeight * 2, data = audio.getChannelData(0);
-          const step = Math.max(1, Math.floor(data.length / w));
-          ctx2.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--muted") || "#9ca3af";
-          for (let x = 0; x < w; x++) {
-            let peak = 0;
-            for (let i = x * step, end = Math.min(data.length, i + step); i < end; i += 4) peak = Math.max(peak, Math.abs(data[i]));
-            const bar = Math.max(1, peak * h * 0.9);
-            ctx2.fillRect(x, (h - bar) / 2, 1, bar);
-          }
+          const data = audio.getChannelData(0), n = 6000, step = Math.max(1, Math.floor(data.length / n));
+          peaks = new Float32Array(Math.ceil(data.length / step));
+          for (let i = 0; i < peaks.length; i++) { let p = 0; for (let k = i * step, e = Math.min(data.length, k + step); k < e; k += 2) p = Math.max(p, Math.abs(data[k])); peaks[i] = p; }
+          drawWave();
         }).catch(() => { /* no waveform, still trimmable */ });
       }
       tl.onpointerdown = (e) => {
@@ -131,17 +160,38 @@
         else { media.currentTime = t; draw(); }
       };
       tl.onpointerup = () => { drag = null; };
+      tl.onwheel = (e) => { e.preventDefault(); zoom(e.deltaY > 0 ? 1.25 : 0.8, timeAt(e)); };
       $("trimPP").onclick = () => { stopAt = null; if (media.paused) media.play(); else media.pause(); };
       $("trimPlaySel").onclick = () => { media.currentTime = a; stopAt = b; media.play(); };
       $("trimSetIn").onclick = () => setA(media.currentTime || 0);
       $("trimSetOut").onclick = () => setB(media.currentTime || 0);
       $("trimA").onchange = (e) => setA(+e.target.value || 0);
       $("trimB").onchange = (e) => setB(+e.target.value || dur);
+      $("trimZoomIn").onclick = () => zoom(0.5);
+      $("trimZoomOut").onclick = () => zoom(2);
+      $("trimFit").onclick = () => { view = { from: 0, to: dur }; drawWave(); draw(); };
+      $("trimMute").onclick = () => { media.muted = !media.muted; draw(); };
+      $("trimFrame").onclick = () => {
+        const c = document.createElement("canvas");
+        c.width = media.videoWidth; c.height = media.videoHeight;
+        c.getContext("2d").drawImage(media, 0, 0);
+        c.toBlob((blob) => { if (blob && opts.onFrame) opts.onFrame(blob, media.currentTime || 0); }, "image/png");
+      };
+      $("trimAudio").onclick = () => { if (opts.onAudio) opts.onAudio(Math.round(a * 100) / 100, Math.round(b * 100) / 100); };
       const keys = (e) => {
         if (e.target.tagName === "INPUT") return;
-        if (e.key === " ") { e.preventDefault(); $("trimPP").click(); }
-        else if (e.key === "i" || e.key === "I") $("trimSetIn").click();
-        else if (e.key === "o" || e.key === "O") $("trimSetOut").click();
+        const k = e.key;
+        if (k === " ") { e.preventDefault(); $("trimPP").click(); }
+        else if (k === "i" || k === "I" || k === "[") $("trimSetIn").click();
+        else if (k === "o" || k === "O" || k === "]") $("trimSetOut").click();
+        else if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); media.pause(); seek((media.currentTime || 0) + (k === "ArrowRight" ? 1 : -1) * FRAME * (e.shiftKey ? 10 : 1)); }
+        else if (k === "Home") { e.preventDefault(); seek(a); }
+        else if (k === "End") { e.preventDefault(); seek(b); }
+        else if (k === "-" || k === "_") zoom(2);
+        else if (k === "+" || k === "=") zoom(0.5);
+        else if (k === "m" || k === "M") $("trimMute").click();
+        else if ((k === "c" || k === "C") && !$("trimFrame").hidden) $("trimFrame").click();
+        else if ((k === "a" || k === "A") && !$("trimAudio").hidden) $("trimAudio").click();
       };
       const finish = (result) => {
         if (done) return; done = true;

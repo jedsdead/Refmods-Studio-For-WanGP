@@ -104,6 +104,18 @@ def create_app(plugin, host):
     def save_subject(payload: dict = Body(...)):
         return service.save_subject(payload.get("subject") or {})
 
+    @app.get("/api/phrases")
+    def phrases():
+        return {"phrases": service.phrases()}
+
+    @app.post("/api/phrases")
+    def save_phrase(payload: dict = Body(...)):
+        return service.save_phrase(payload.get("text"), payload.get("category"), payload.get("id"))
+
+    @app.post("/api/phrases/delete")
+    def delete_phrase(payload: dict = Body(...)):
+        return service.delete_phrase(payload.get("id"))
+
     @app.get("/api/packs")
     def packs():
         return {"packs": service.pack_list()}

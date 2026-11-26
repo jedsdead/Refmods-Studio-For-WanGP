@@ -35,7 +35,7 @@
   <button id="btnWrite">Write it all…</button>
   <button id="btnCheck" title="Check whatever is in the Generator page's prompt box">Check the prompt box</button>
   <span class="grow"></span>
-  <span id="status" class="status" role="status"></span>
+  <span id="status" class="status" role="status"></span><button id="tagUndo" class="small" hidden>Undo</button>
 </div>
 
 <section class="sends">
@@ -78,6 +78,8 @@
         <span class="sep"></span>
         <select id="subjSel" aria-label="Subject"></select>
         <button data-snip="subject">Subject</button>
+        <span class="sep"></span>
+        <button id="btnPhrases" title="Wording you reuse. Select text in a box and press Ctrl+Enter to save it as one">Phrases</button>
       </div>
       <div class="row dialogue">
         <span class="cap">Line</span>
@@ -88,7 +90,7 @@
         <input id="dLine" placeholder="The line, word for word" aria-label="Line" class="grow">
         <button data-snip="line" class="primary">Insert line</button>
       </div>
-      <div class="muted small">Time, Shot, Camera and lines go into Action at its cursor. Subject and labels go into the box you last clicked.</div>
+      <div class="muted small">Time, Shot, Camera and lines go into Action at its cursor. Subject and labels go into the box you last clicked. Type <b>!Name</b> for a subject (Tab completes it). Right-click a tag to swap or remove it.</div>
     </section>
 
     <section class="field">
@@ -123,6 +125,7 @@
   <aside class="right">
     <section class="card sticky">
       <div class="card-head"><span class="cap">Live preview</span><span class="muted small">labels as predicted · the console prints the real ones</span><span class="grow"></span><button id="btnCopy" class="small">Copy</button></div>
+      <div class="switches" id="sections" title="Switch a section off without deleting it"></div>
       <pre id="preview" class="preview"></pre>
       <div class="cap">Checks</div>
       <ul id="checks" class="checks"></ul>
@@ -130,6 +133,15 @@
   </aside>
 </main>
 
+<div class="ctx" id="ctx" hidden></div>
+<div class="suggest" id="suggest" hidden></div>
+<dialog id="phraseDlg"><div class="dlg">
+  <div class="row"><h2>Phrases</h2><span class="grow"></span><input id="phSearch" type="search" placeholder="Search" aria-label="Search phrases"><select id="phCat" aria-label="Category"></select></div>
+  <div class="phlist" id="phList"></div>
+  <div class="row phsave"><textarea id="phText" rows="2" placeholder="A phrase to save: select text in a box and press Ctrl+Enter, or type it here"></textarea></div>
+  <div class="row"><input id="phNewCat" placeholder="Category" list="phCats" class="num" style="width:160px"><datalist id="phCats"></datalist>
+    <button id="phSave" class="primary">Save phrase</button><span class="muted small">Click a phrase to insert it where you were typing.</span><span class="grow"></span><button id="phClose">Close</button></div>
+</div></dialog>
 <dialog id="writeDlg">
   <form method="dialog" class="dlg">
     <h2>Write it all with the prompt enhancer</h2>

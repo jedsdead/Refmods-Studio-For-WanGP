@@ -117,9 +117,9 @@ def _h3_estimate(sources, form):
         pictures, enc_frames = 1, 1
     tokens *= max(1, int(form.get("multiplier") or 1))
     cap = int(form.get("max_tokens") or 0)
-    if cap and tokens > cap:
-        warnings.append(f"Over the {cap:,}-token cap, so some pictures or frames will be dropped to fit.")
-        tokens = cap
+    if cap and tokens > cap:   # nothing is dropped quietly: Create waits until it fits
+        form["_blocked"] = (f"it would be {tokens:,} tokens, over the {cap:,} cap. Use fewer pictures, a shorter trim, "
+                            "fewer pictures per second or Compressed, or raise Max tokens under Advanced")
     audio = _audio_part(sources, form, warnings, has_visual=bool(pictures or clips))
     tokens += audio
     edge = int(form.get("enc_resolution") or core.ENC_MAX_EDGE)
@@ -308,3 +308,28 @@ def plan(form, sources):
             "order": order, "clean_audio": bool(form.get("clean_audio")),
         }))
     return out
+
+
+# -- cutting audio out of a source (the trim editor's Use audio) -------------------------
+
+def cut_audio(token, start, end):
+    """The kept range of an audio or video file as a new WAV upload."""
+    path = lib.upload_path(token)
+    if not path:
+        raise FileNotFoundError(token)
+    start, end = max(0.0, float(start or 0)), float(end or 0)
+    if end - start < MIN_AUDIO_SECONDS - 0.05:
+        raise ValueError(f"keep at least {MIN_AUDIO_SECONDS:g} seconds; H3 refuses shorter audio")
+    stem = os.path.splitext(os.path.basename(path).split("_", 1)[-1])[0]
+    out = os.path.join(lib.uploads_dir(), f"{os.urandom(4).hex()}_{stem}_{start:.1f}-{end:.1f}s.wav")
+    try:
+        import soundfile as sf
+        info = sf.info(path)
+        data, rate = sf.read(path, start=int(start * info.samplerate), stop=int(end * info.samplerate), always_2d=True)
+        sf.write(out, data, rate)
+    except Exception:                                                  # noqa: BLE001
+        waveform = storage.extract_audio_from_video(path, max_seconds=end - start, start_seconds=start)
+        if waveform is None:
+            raise ValueError("no sound could be read from that file")
+        storage.save_wav(waveform[0] if waveform.dim() == 3 else waveform, out)
+    return probe(os.path.basename(out))

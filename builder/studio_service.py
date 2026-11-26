@@ -279,6 +279,46 @@ class Service:
                 else "Every picture and mod already has a subject.")
         return {"form": form, "note": note}
 
+    # -- phrases: wording you reuse -------------------------------------------------------
+
+    def _phrases_path(self):
+        return data_dir() / "phrases.json"
+
+    def phrases(self):
+        try:
+            items = json.loads(self._phrases_path().read_text(encoding="utf-8"))
+        except Exception:                                 # noqa: BLE001
+            items = []
+        return [p for p in items if isinstance(p, dict) and p.get("text")]
+
+    def _write_phrases(self, items):
+        path = self._phrases_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(items, indent=1, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+
+    def save_phrase(self, text, category="", phrase_id=None):
+        text = str(text or "").strip()
+        if not text:
+            return {"ok": False, "note": "Select some text first, or type the phrase."}
+        category = str(category or "").strip()[:40] or "General"
+        items = self.phrases()
+        old = next((p for p in items if p.get("id") == phrase_id), None) if phrase_id else None
+        if old:
+            old.update(text=text, category=category)
+        elif any(p["text"] == text for p in items):
+            return {"ok": True, "note": "That phrase is already saved.", "phrases": items}
+        else:
+            items.append({"id": uuid.uuid4().hex[:10], "text": text, "category": category, "saved": time.time()})
+        self._write_phrases(items)
+        return {"ok": True, "note": f"Saved to phrases ({category}).", "phrases": items}
+
+    def delete_phrase(self, phrase_id):
+        items = [p for p in self.phrases() if p.get("id") != phrase_id]
+        self._write_phrases(items)
+        return {"ok": True, "note": "Phrase deleted.", "phrases": items}
+
     # -- packs (Refmods) ---------------------------------------------------------------
 
     def _storage(self):

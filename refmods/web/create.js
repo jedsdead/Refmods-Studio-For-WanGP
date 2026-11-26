@@ -96,7 +96,9 @@
       if (el.querySelector(".cCrop")) el.querySelector(".cCrop").addEventListener("click", () => crop(i));
       if (el.querySelector(".cTrim")) el.querySelector(".cTrim").addEventListener("click", async () => {
         const r = await RS.trim({ src: fileUrl(s.token), kind: s.kind, title: "Trim " + s.name, start: s.start, end: s.end || s.seconds,
-                                  duration: s.seconds, min: s.kind === "audio" ? 2 : 0.2 });
+                                  duration: s.seconds, min: s.kind === "audio" ? 2 : 0.2,
+                                  onFrame: s.kind === "video" ? (blob, t) => useFrame(i, s, blob, t) : null,
+                                  onAudio: S.family === "h3" ? (a, b) => useAudio(s, a, b) : null });
         if (r) { s.start = r.start; s.end = r.end; renderSources(); changed(); }
       });
       if (el.querySelector(".tA")) {
@@ -125,6 +127,24 @@
     $("cAsPictures").closest(".video-opt").querySelector(".pps").hidden = S.family !== "flux" && !$("cAsPictures").checked;
   }
 
+  // The trim editor's Use frame and Use audio: a new source from part of this one.
+  async function useFrame(index, s, blob, t) {
+    try {
+      const file = new File([blob], `${s.name.replace(/\.[^.]+$/, "")}_${t.toFixed(1)}s.png`, { type: "image/png" });
+      const r = await RS.upload(file);
+      S.sources.splice(index + 1, 0, { token: r.token, name: r.name || file.name, kind: "image", width: r.width, height: r.height, start: 0, end: 0 });
+      renderSources(); changed(); toast(`Added the frame at ${t.toFixed(1)} s as a picture.`);
+    } catch (e) { toast("Couldn't add the frame: " + e.message, true); }
+  }
+  async function useAudio(s, a, b) {
+    if (S.sources.some((x) => x.kind === "audio") && !confirm("There's already an audio file, and only the first is used. Add this one anyway?")) return;
+    try {
+      const r = await api("cut_audio", { token: s.token, start: a, end: b });
+      S.sources.push({ token: r.token, name: r.name, kind: "audio", seconds: r.seconds, start: 0, end: r.seconds || 0 });
+      renderSources(); changed(); toast(`Added ${(b - a).toFixed(1)} s of sound as an audio file.`);
+    } catch (e) { toast("Couldn't cut the sound: " + e.message, true); }
+  }
+
   // ---------------------------------------------------------------- crop
   function crop(index) {
     const s = S.sources[index], dlg = $("cropDlg"), img = $("cropImg"), box = $("cropBox");
@@ -140,6 +160,24 @@
     };
     img.onload = () => { scale = img.naturalWidth / img.clientWidth; fit(); };
     img.src = fileUrl(source.token);
+    // Rotate and Mirror make a turned copy of the picture to crop from; the original stays as it was.
+    let work = source;
+    const transform = (rotate) => {
+      const c = document.createElement("canvas"), w = img.naturalWidth, h = img.naturalHeight;
+      c.width = rotate ? h : w; c.height = rotate ? w : h;
+      const g = c.getContext("2d");
+      if (rotate) { g.translate(h, 0); g.rotate(Math.PI / 2); } else { g.translate(w, 0); g.scale(-1, 1); }
+      g.drawImage(img, 0, 0);
+      c.toBlob(async (blob) => {
+        try {
+          const r = await RS.upload(new File([blob], (rotate ? "turned_" : "mirrored_") + source.name.replace(/\.[^.]+$/, "") + ".png", { type: "image/png" }));
+          work = { ...source, token: r.token, width: c.width, height: c.height };
+          img.src = fileUrl(r.token);
+        } catch (e) { toast("Couldn't turn it: " + e.message, true); }
+      }, "image/png");
+    };
+    $("cropRotate").onclick = () => transform(true);
+    $("cropMirror").onclick = () => transform(false);
     $("cropAspect").querySelectorAll("button").forEach((b) => {
       b.classList.toggle("on", b.dataset.r === "0");
       b.onclick = () => { ratio = +b.dataset.r; $("cropAspect").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); fit(); };
@@ -181,7 +219,7 @@
         try {
           const file = new File([blob], "crop_" + source.name.replace(/\.[^.]+$/, "") + ".png", { type: "image/png" });
           const r = await RS.upload(file);
-          S.sources[index] = { ...source, token: r.token, width: sw, height: sh, orig: { ...source } };
+          S.sources[index] = { ...work, token: r.token, width: sw, height: sh, orig: { ...source } };
           renderSources(); changed();
         } catch (e) { toast("Couldn't crop: " + e.message, true); }
       }, "image/png");

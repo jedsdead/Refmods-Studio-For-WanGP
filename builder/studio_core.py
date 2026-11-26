@@ -50,12 +50,14 @@ PROMPT_CHAR_LIMIT = 7000
 WORDS_PER_SECOND = 2.8
 
 SUBJECT_KEYS = ("kind", "name", "gender", "age", "ethnicity", "height", "build", "hairstyle", "haircolor",
-                "eyecolor", "clothing", "details", "look", "parts", "sheet", "voice", "accent")
+                "eyecolor", "clothing", "details", "look", "parts", "sheet", "voice", "accent", "def_off", "ret_off")
 # What a saved subject keeps. look and voice point at this generation's
-# media, so they belong to the project, not the character.
-LIBRARY_KEYS = tuple(k for k in SUBJECT_KEYS if k not in ("look", "voice"))
+# media, so they belong to the project, not the character; the switches too.
+LIBRARY_KEYS = tuple(k for k in SUBJECT_KEYS if k not in ("look", "voice", "def_off", "ret_off"))
 
-FORM_KEYS = ("mode", "duration", "summary", "style", "action", "sound", "music", "subjects", "window_duration")
+FORM_KEYS = ("mode", "duration", "summary", "style", "action", "sound", "music", "subjects", "window_duration", "off")
+# Sections that can be switched off without deleting what's in them (detailed_description can't).
+SWITCHABLE = ("subject_definitions", "summary", "retention_analysis", "overall_soundscape", "non_diegetic_music")
 
 
 def _s(value) -> str:
@@ -65,12 +67,12 @@ def _s(value) -> str:
 def new_subject(kind="Character") -> dict:
     return {"kind": kind, "name": "", "gender": "", "age": "", "ethnicity": "", "height": "", "build": "",
             "hairstyle": "", "haircolor": "", "eyecolor": "", "clothing": "", "details": "", "look": [],
-            "parts": list(DEFAULT_PARTS), "sheet": False, "voice": "", "accent": ""}
+            "parts": list(DEFAULT_PARTS), "sheet": False, "voice": "", "accent": "", "def_off": False, "ret_off": False}
 
 
 def new_form() -> dict:
     return {"mode": AUTO, "duration": 10.0, "summary": "", "style": "", "action": "", "sound": "",
-            "music": "N/A", "subjects": [], "window_duration": False}
+            "music": "N/A", "subjects": [], "window_duration": False, "off": []}
 
 
 def clean_look(item, parts=None, sheet=False) -> dict:
@@ -95,6 +97,7 @@ def clean_subject(data) -> dict:
     out["look"] = [clean_look(i, out["parts"], out["sheet"]) for i in (out["look"] or [])]
     out["look"] = [l for l in out["look"] if l["key"]][:MAX_LOOKS]
     out["kind"] = out["kind"] if out["kind"] in KINDS else "Character"
+    out["def_off"], out["ret_off"] = bool(out["def_off"]), bool(out["ret_off"])
     return out
 
 
@@ -112,6 +115,41 @@ def clean_form(data) -> dict:
     if form["mode"] not in MODES:
         form["mode"] = AUTO
     form["window_duration"] = bool(form["window_duration"])
+    form["off"] = [x for x in (form["off"] or []) if x in SWITCHABLE]
+    return expand_names(form)
+
+
+# -- !Name shorthand -----------------------------------------------------------------
+
+NAME_MARK = "!"
+
+
+def name_tag(subjects: list, index: int) -> str:
+    return f"<Subject {index}>"
+
+
+def expand_names(form: dict) -> dict:
+    """!Jodi (or !Jodi Maren) anywhere in the writing boxes becomes that subject's tag. Matches the full name or,
+    when it's unique, the first word of it; case doesn't matter. Unknown names are left as typed."""
+    names = []
+    firsts = {}
+    for n, subject in enumerate(form.get("subjects") or [], 1):
+        name = _s(subject.get("name"))
+        if name:
+            names.append((name, n))
+            firsts.setdefault(name.split()[0].lower(), []).append(n)
+    for first, ns in firsts.items():
+        if len(ns) == 1 and not any(first == full.lower() for full, _ in names):
+            names.append((first, ns[0]))
+    if not names:
+        return form
+    names.sort(key=lambda item: -len(item[0]))
+    pattern = re.compile(re.escape(NAME_MARK) + "(" + "|".join(re.escape(n) for n, _ in names) + r")(?![\w'-])", re.I)
+    lookup = {n.lower(): i for n, i in names}
+    for box in ("summary", "style", "action", "sound", "music"):
+        text = form.get(box) or ""
+        if NAME_MARK in text:
+            form[box] = pattern.sub(lambda m: f"<Subject {lookup[m.group(1).lower()]}>", text)
     return form
 
 
@@ -513,6 +551,8 @@ def subject_definitions(form: dict, media: list[Media]) -> str:
     sids = speaker_ids(form["action"], form["subjects"], True)
     lines = []
     for n, subject in enumerate(form["subjects"], 1):
+        if subject.get("def_off"):
+            continue
         tag = f"<Subject {n}>"
         looks, voice = subject_media(subject, by_key)
         desc = describe(subject)
@@ -551,6 +591,8 @@ def retention_lines(form: dict, media: list[Media]) -> str:
     by_key = media_by_key(media)
     lines = []
     for n, subject in enumerate(form["subjects"], 1):
+        if subject.get("ret_off"):
+            continue
         tag = f"<Subject {n}>"
         kind = subject.get("kind") or "Character"
         looks, voice = subject_media(subject, by_key)
@@ -657,6 +699,7 @@ def _assemble(form: dict, media: list[Media], mode: str) -> str:
                  ("retention_analysis", retention_lines(form, media) or "N/A"),
                  ("detailed_description", body),
                  ("overall_soundscape", sound), ("non_diegetic_music", music)]
+        parts = [(name, text) for name, text in parts if name not in form["off"]]
         return no_blank_lines("\n".join(f"<{name}>\n{text}\n</{name}>" for name, text in parts))
     lines = []
     instruction = keyframe_line(mode, form)
@@ -664,8 +707,10 @@ def _assemble(form: dict, media: list[Media], mode: str) -> str:
         lines.append(instruction)
     body = " ".join(b for b in (style, action) if b)
     lines.append(f"integrated_multimodal_description: {body}")
-    lines.append(f"overall_soundscape: {sound}")
-    lines.append(f"non_diegetic_music: {music}")
+    if "overall_soundscape" not in form["off"]:
+        lines.append(f"overall_soundscape: {sound}")
+    if "non_diegetic_music" not in form["off"]:
+        lines.append(f"non_diegetic_music: {music}")
     return no_blank_lines("\n".join(lines))
 
 
@@ -754,6 +799,17 @@ def checks(form: dict, media: list[Media], mode: str, text: str, detected: str, 
         if mode == "Reference" and f"<Subject {n}>" not in form["action"]:
             warnings.append(f"<Subject {n}> ({name}) is defined but never appears in the action")
 
+    # (Shot numbering and unbalanced <d> tags are flagged by the format check above.)
+    left = sorted(set(re.findall(re.escape(NAME_MARK) + r"([A-Za-z][\w'-]*)", " ".join(
+        form[b] or "" for b in ("summary", "style", "action")))))
+    if left:
+        warnings.append("no subject is called " + ", ".join(f"{NAME_MARK}{n}" for n in left[:5])
+                        + ", so it's left as typed")
+    if form["off"]:
+        info.append("switched off: " + ", ".join(form["off"]))
+    off_subjects = [display_name(s, n) for n, s in enumerate(form["subjects"], 1) if s.get("def_off") or s.get("ret_off")]
+    if off_subjects:
+        info.append("lines switched off for " + ", ".join(off_subjects))
     times = shot_times(form["action"])
     duration = float(form["duration"] or 0)
     if times:

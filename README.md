@@ -27,6 +27,11 @@ any mods in the Refmods panel. The **Prompt Builder** subtab reads them:
   Reference mode they write `subject_definitions` and `retention_analysis` in the bundled H3 guide's wording.
 - **Insert**: Shot, Camera, Subject and Dialogue write the guide's notation at the cursor. Only **Time** writes a
   timestamp, so a line or a shot has one only where you put it.
+- **Tags**: right-click one to swap it with another or remove it, here, in this box or everywhere (a subject goes
+  with its tag). Type `!Name` for a subject; Tab completes it.
+- **Phrases** keeps wording you reuse: select text and press Ctrl+Enter to save it.
+- **Switches** above the preview leave a section out without deleting it; the subject editor does the same for a
+  subject's definition line and retention rows.
 - **Enhance** on Action, Sound and Music asks the prompt enhancer set in Configuration to write that box.
 - The **live preview** shows the finished prompt, with the checks under it. **Insert into prompt** and **Append
   window** put it in the prompt box.
@@ -62,7 +67,7 @@ creating, decoding, strength previews, encoder frames and soundtracks.
   - **Replace preview** sets the picture shown for a mod. The mod itself doesn't change.
   - Ctrl-click or tick several to move, add to a pack, update or delete them together, or drag them onto a folder.
 - **Create** makes mods for MiniMax H3 or Flux. Drop pictures, videos or an audio file, drag them into order, crop
-  pictures, and scrub through videos and audio to set in and out points. Make one mod from all of them or one per picture or video, at **Full** (exact, best
+  pictures (with rotate and mirror), and scrub through videos and audio to set in and out points; **Use frame** and **Use audio** add a still or the kept sound as a new source. Make one mod from all of them or one per picture or video, at **Full** (exact, best
   for faces) or **Compressed** (smaller). The estimate shows the tokens and file size, and **Create** stays locked
   until the mod can be made. Every option from the old Extract tabs is under **Advanced**.
 - **Packs** edits packs: their mods, each one's role, strength (up to 2), how it's sent, its sound, and an **On**

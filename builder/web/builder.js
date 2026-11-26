@@ -208,7 +208,10 @@
       ${field("details", "Description", "What the camera sees")}
       <div class="muted small">Look comes from: the pictures or mods showing it. Leave on none to describe it in words only.</div>`;
     $("editor").innerHTML = `
-      <div class="card-head"><span class="cap">Subject ${S.selected + 1} · ${character ? "character creator" : esc(s.kind.toLowerCase())}</span><span class="muted small">Leave a field blank to skip it.</span><span class="grow"></span><button type="button" class="small" id="btnLibSave">Save to library</button></div>
+      <div class="card-head"><span class="cap">Subject ${S.selected + 1} · ${character ? "character creator" : esc(s.kind.toLowerCase())}</span><span class="muted small">Leave a field blank to skip it.</span><span class="grow"></span>
+        <label class="inline small" title="Off leaves this subject's line out of subject_definitions"><input type="checkbox" data-sw="def_off"${s.def_off ? "" : " checked"}> definition line</label>
+        <label class="inline small" title="Off leaves this subject's rows out of retention_analysis"><input type="checkbox" data-sw="ret_off"${s.ret_off ? "" : " checked"}> retention rows</label>
+        <button type="button" class="small" id="btnLibSave">Save to library</button></div>
       ${people}
       ${rows}`;
   }
@@ -216,6 +219,7 @@
     const s = S.form.subjects[S.selected];
     if (!s) return;
     const t = e.target;
+    if (t.dataset.sw) { s[t.dataset.sw] = !t.checked; changed(); return; }
     if (t.dataset.f) {
       s[t.dataset.f] = t.value;
       if (t.dataset.f === "name" || t.dataset.f === "kind") drawCards();
@@ -245,7 +249,7 @@
   // ---------------------------------------------------------------- the form
   function loadForm(form, note) {
     S.form = Object.assign({ mode: "Auto", duration: 10, window_duration: false, summary: "", style: "", action: "",
-                             sound: "", music: "N/A", subjects: [] }, form || {});
+                             sound: "", music: "N/A", subjects: [], off: [] }, form || {});
     S.selected = 0;
     $("duration").value = S.form.duration;
     $("winDur").checked = !!S.form.window_duration;
@@ -258,6 +262,7 @@
       const out = await api("preview", { form: S.form });
       S.preview = out;
       $("preview").innerHTML = highlight(out.text);
+      drawSections();
       $("detected").textContent = `Picked from the Generator page: ${out.summary} → ${out.detected}` +
         (S.form.mode !== "Auto" ? ` · writing ${out.mode}` : "");
       drawModes(out.detected);
@@ -308,6 +313,200 @@
       S.undo[part] = $(part).value;
       $(part).value = st.text; S.form[part] = st.text; changed(); status(st.note);
     }, button);
+  }
+
+  // ---------------------------------------------------------------- tags: swap, remove, renumber
+  const TAG_RE = /<(Subject|Picture|Video|Audio) (\d+)>|\(S(\d+)\)/g;
+  const tagText = (kind, n) => (kind === "S" ? `(S${n})` : `<${kind} ${n}>`);
+  function tagAt(text, pos) {
+    TAG_RE.lastIndex = 0;
+    let m;
+    while ((m = TAG_RE.exec(text))) {
+      if (pos >= m.index && pos <= m.index + m[0].length) return { kind: m[1] || "S", n: +(m[2] || m[3]), start: m.index, end: m.index + m[0].length, text: m[0] };
+    }
+    return null;
+  }
+  function mapTags(fn, boxes) {
+    for (const b of boxes) {
+      const v = S.form[b] || "";
+      const nv = v.replace(TAG_RE, (m0, k, n1, n2) => { const r = fn(k || "S", +(n1 || n2)); return r === undefined ? m0 : r; })
+        .replace(/[ \t]{2,}/g, " ").replace(/ +([,.;:!?])/g, "$1");
+      if (nv !== v) { S.form[b] = nv; $(b).value = nv; }
+    }
+  }
+  const swapTags = (kind, a, b, boxes) => mapTags((k, n) => (k !== kind ? undefined : n === a ? tagText(kind, b) : n === b ? tagText(kind, a) : undefined), boxes);
+  function swapSubjects(a, b) {
+    if (a === b) return;
+    swapTags("Subject", a, b, BOXES);
+    const s = S.form.subjects; [s[a - 1], s[b - 1]] = [s[b - 1], s[a - 1]];
+  }
+  function removeSubject(n) {
+    mapTags((k, m) => (k !== "Subject" ? undefined : m === n ? "" : m > n ? tagText("Subject", m - 1) : undefined), BOXES);
+    S.form.subjects.splice(n - 1, 1);
+    S.selected = Math.min(S.selected, Math.max(0, S.form.subjects.length - 1));
+  }
+  function mediaOf(kind, n) {
+    return ((S.session && S.session.media) || []).find((m) => (m.labels || []).includes(tagText(kind, n)));
+  }
+  function candidates(kind) {
+    if (kind === "Subject") return S.form.subjects.map((s, i) => [i + 1, subjectName(s, i + 1)]);
+    if (kind === "S") {
+      const ids = new Set();
+      BOXES.forEach((b) => (S.form[b] || "").replace(/\(S(\d+)\)/g, (_, d) => { ids.add(+d); return _; }));
+      for (let i = 1; i <= ids.size + 1; i++) ids.add(i);
+      return [...ids].sort((a, b) => a - b).map((i) => [i, "speaker"]);
+    }
+    const out = [];
+    ((S.session && S.session.media) || []).forEach((m) => (m.labels || []).forEach((l) => {
+      const mm = l.match(/^<(\w+) (\d+)>$/);
+      if (mm && mm[1] === kind) out.push([+mm[2], m.name]);
+    }));
+    return out;
+  }
+  // Snapshots, so a tag change can be undone in one click.
+  const snap = () => JSON.stringify({ boxes: Object.fromEntries(BOXES.map((b) => [b, S.form[b] || ""])), subjects: S.form.subjects });
+  function done(before, note) {
+    S.tagUndo = before;
+    $("tagUndo").hidden = false;
+    drawCards(); drawEditor(); changed(); status(note);
+  }
+  function undoTags() {
+    if (!S.tagUndo) return;
+    const d = JSON.parse(S.tagUndo);
+    BOXES.forEach((b) => { S.form[b] = d.boxes[b]; $(b).value = d.boxes[b]; });
+    S.form.subjects = d.subjects;
+    S.selected = Math.min(S.selected, Math.max(0, S.form.subjects.length - 1));
+    S.tagUndo = null; $("tagUndo").hidden = true;
+    drawCards(); drawEditor(); changed(); status("Undone.");
+  }
+  function closeMenu() { $("ctx").hidden = true; }
+  function tagMenu(e, box) {
+    const el = $(box), sel = el.value.slice(el.selectionStart, el.selectionEnd);
+    const tag = tagAt(el.value, el.selectionStart);
+    if (!tag && !sel.trim()) return;                 // the browser's own menu
+    e.preventDefault();
+    let scope = tag && (tag.kind === "Subject" || tag.kind === "S") ? "all" : "all";
+    const name = tag ? (tag.kind === "Subject" ? (S.form.subjects[tag.n - 1] ? subjectName(S.form.subjects[tag.n - 1], tag.n) : "no such subject")
+      : tag.kind === "S" ? "speaker ID" : ((mediaOf(tag.kind, tag.n) || {}).name || "not sent")) : "";
+    const others = tag ? candidates(tag.kind).filter(([n]) => n !== tag.n) : [];
+    const menu = $("ctx");
+    menu.innerHTML = (tag ? `<div class="h">${esc(tag.text)} · ${esc(name)}</div>
+      <div class="scope">${[["one", "Here"], ["box", "This box"], ["all", "Everywhere"]].map(([v, l]) => `<button data-scope="${v}" class="${v === scope ? "on" : ""}">${l}</button>`).join("")}</div>
+      ${others.map(([n, label]) => `<button data-swap="${n}">Swap with ${esc(tagText(tag.kind, n))}${label ? ` <span class="muted small">${esc(label)}</span>` : ""}</button>`).join("")}
+      <button data-act="remove">Remove ${esc(tag.text)}</button>` : "") +
+      (sel.trim() ? `${tag ? "<hr>" : ""}<button data-act="phrase">Save as phrase</button><button data-act="copy">Copy</button><button data-act="cut">Cut</button><button data-act="delete">Remove the selection</button>` : "") +
+      `<hr><div class="h" style="text-transform:none;letter-spacing:0;font-weight:400">Shift+right-click for the browser's menu</div>`;
+    menu.hidden = false;
+    const r = menu.getBoundingClientRect();
+    menu.style.left = Math.min(e.clientX, innerWidth - r.width - 8) + "px";
+    menu.style.top = Math.min(e.clientY, innerHeight - r.height - 8) + "px";
+    menu.onclick = async (ev) => {
+      const b = ev.target.closest("button"); if (!b) return;
+      if (b.dataset.scope) { scope = b.dataset.scope; menu.querySelectorAll("[data-scope]").forEach((x) => x.classList.toggle("on", x === b)); return; }
+      closeMenu();
+      const before = snap();
+      if (b.dataset.act === "phrase") { openPhrases(sel); return; }
+      if (b.dataset.act === "copy" || b.dataset.act === "cut") { try { await navigator.clipboard.writeText(sel); } catch (_) { /* no clipboard here */ } }
+      if (b.dataset.act === "cut" || b.dataset.act === "delete") {
+        el.setRangeText("", el.selectionStart, el.selectionEnd, "start"); S.form[box] = el.value; done(before, b.dataset.act === "cut" ? "Cut." : "Removed."); return;
+      }
+      if (b.dataset.act === "copy") { status("Copied."); return; }
+      if (!tag) return;
+      const where = scope === "one" ? "here" : scope === "box" ? `in ${box}` : "everywhere";
+      if (b.dataset.swap) {
+        const to = +b.dataset.swap;
+        if (scope === "one") { el.setRangeText(tagText(tag.kind, to), tag.start, tag.end, "end"); S.form[box] = el.value; }
+        else if (scope === "box") swapTags(tag.kind, tag.n, to, [box]);
+        else if (tag.kind === "Subject") swapSubjects(tag.n, to);
+        else swapTags(tag.kind, tag.n, to, BOXES);
+        done(before, `Swapped ${tag.text} and ${tagText(tag.kind, to)} ${where}` + (scope === "all" && tag.kind === "Subject" ? ", with their subjects." : "."));
+        return;
+      }
+      if (b.dataset.act === "remove") {
+        let note = `Removed ${tag.text} ${where}.`;
+        if (scope === "one") { el.setRangeText("", tag.start, tag.end, "start"); S.form[box] = el.value; mapTags(() => undefined, [box]); }
+        else if (scope === "box") mapTags((k, n) => (k === tag.kind && n === tag.n ? "" : undefined), [box]);
+        else if (tag.kind === "Subject") { removeSubject(tag.n); note = `Removed ${tag.text} and its subject; the later subjects moved up.`; }
+        else {
+          mapTags((k, n) => (k === tag.kind && n === tag.n ? "" : undefined), BOXES);
+          const m = tag.kind !== "S" && mediaOf(tag.kind, tag.n);
+          if (m && (m.labels || []).length === 1) {          // its definition and retention lines go too
+            S.form.subjects.forEach((s) => { s.look = (s.look || []).filter((l) => l.key !== m.key); if (s.voice === m.key) s.voice = ""; });
+            note += " It's no longer a source for any subject.";
+          }
+        }
+        done(before, note);
+      }
+    };
+  }
+
+  // ---------------------------------------------------------------- !Name: a subject by name
+  const sug = { box: null, items: [], i: 0, start: 0 };
+  function nameSuggest(box) {
+    const el = $(box), pos = el.selectionStart, before = el.value.slice(0, pos);
+    const m = before.match(/(^|[^\w])!([A-Za-z][\w' -]*)?$/);
+    const names = S.form.subjects.map((s, i) => (s.name || "").trim()).filter(Boolean);
+    if (!m || !names.length) { hideSuggest(); return; }
+    const part = (m[2] || "").toLowerCase();
+    const items = names.filter((n) => n.toLowerCase().startsWith(part) && n.toLowerCase() !== part);
+    if (!items.length) { hideSuggest(); return; }
+    Object.assign(sug, { box, items, i: 0, start: pos - (m[2] || "").length });
+    const r = el.getBoundingClientRect(), list = $("suggest");
+    list.innerHTML = items.map((n, i) => `<div data-i="${i}" class="${i === 0 ? "on" : ""}">!${esc(n)}</div>`).join("") +
+      `<div class="muted small" style="cursor:default">Tab completes · Esc closes</div>`;
+    list.hidden = false;
+    list.style.left = r.left + 8 + "px"; list.style.top = Math.min(r.bottom + 2, innerHeight - list.offsetHeight - 6) + "px";
+    list.onmousedown = (e) => { const d = e.target.closest("[data-i]"); if (d) { e.preventDefault(); sug.i = +d.dataset.i; completeName(); } };
+  }
+  function hideSuggest() { $("suggest").hidden = true; sug.box = null; }
+  function completeName() {
+    const el = $(sug.box), name = sug.items[sug.i];
+    el.setRangeText(name, sug.start, el.selectionStart, "end");
+    S.form[sug.box] = el.value; hideSuggest(); changed();
+  }
+  function suggestKeys(e) {
+    if (!sug.box || $("suggest").hidden) return false;
+    if (e.key === "Tab" || e.key === "Enter") { e.preventDefault(); completeName(); return true; }
+    if (e.key === "Escape") { e.preventDefault(); hideSuggest(); return true; }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault(); sug.i = (sug.i + (e.key === "ArrowDown" ? 1 : sug.items.length - 1)) % sug.items.length;
+      $("suggest").querySelectorAll("[data-i]").forEach((d) => d.classList.toggle("on", +d.dataset.i === sug.i)); return true;
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------------- phrases
+  const PH = { items: [], target: "action" };
+  async function openPhrases(text) {
+    PH.target = S.lastBox;
+    try { PH.items = (await api("phrases")).phrases; } catch (_) { PH.items = []; }
+    $("phText").value = text || "";
+    drawPhrases();
+    $("phraseDlg").showModal();
+    (text ? $("phNewCat") : $("phSearch")).focus();
+  }
+  function drawPhrases() {
+    const cats = [...new Set(PH.items.map((p) => p.category || "General"))].sort();
+    options($("phCat"), [["", "All categories"]].concat(cats.map((c) => [c, c])), $("phCat").value);
+    $("phCats").innerHTML = cats.map((c) => `<option value="${esc(c)}">`).join("");
+    const q = $("phSearch").value.toLowerCase(), cat = $("phCat").value;
+    const list = PH.items.filter((p) => (!cat || p.category === cat) && (!q || p.text.toLowerCase().includes(q) || (p.category || "").toLowerCase().includes(q)));
+    $("phList").innerHTML = list.length ? list.map((p) => `<div class="ph" data-id="${esc(p.id)}"><span class="t">${esc(p.text)}</span><span class="c">${esc(p.category || "")}</span><span class="x" data-del="${esc(p.id)}" title="Delete">✕</span></div>`).join("")
+      : `<div class="empty">${PH.items.length ? "No phrase matches." : "No phrases yet. Select text in a box and press Ctrl+Enter, or type one below."}</div>`;
+  }
+  async function savePhrase() {
+    const r = await api("phrases", { text: $("phText").value, category: $("phNewCat").value });
+    status(r.note);
+    if (r.ok) { PH.items = r.phrases; $("phText").value = ""; drawPhrases(); }
+  }
+
+  // ---------------------------------------------------------------- section switches
+  const SECTIONS = ["subject_definitions", "summary", "retention_analysis", "overall_soundscape", "non_diegetic_music"];
+  function drawSections() {
+    const reference = !S.preview || S.preview.mode === "Reference";
+    const shown = reference ? SECTIONS : SECTIONS.slice(3);
+    const off = S.form.off || [];
+    $("sections").innerHTML = shown.map((name) => `<button type="button" data-sec="${name}" aria-pressed="${!off.includes(name)}" title="${off.includes(name) ? "Off: left out of the prompt" : "On"}">${name}</button>`).join("");
   }
 
   // ---------------------------------------------------------------- packs
@@ -414,8 +613,37 @@
     for (const id of BOXES) {
       const el = $(id);
       el.addEventListener("focus", () => { S.lastBox = id; if (id === "action") S.actionUsed = true; });
-      el.addEventListener("input", () => { S.form[id] = el.value; changed(); });
+      el.addEventListener("input", () => { S.form[id] = el.value; changed(); nameSuggest(id); });
+      el.addEventListener("contextmenu", (e) => { if (!e.shiftKey) tagMenu(e, id); });
+      el.addEventListener("keydown", (e) => {
+        if (suggestKeys(e)) return;
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); openPhrases(el.value.slice(el.selectionStart, el.selectionEnd)); }
+      });
+      el.addEventListener("blur", () => setTimeout(hideSuggest, 150));
     }
+    document.addEventListener("click", (e) => { if (!e.target.closest("#ctx")) closeMenu(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("ctx").hidden) { e.preventDefault(); closeMenu(); } });
+    $("tagUndo").addEventListener("click", undoTags);
+    $("sections").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-sec]"); if (!b) return;
+      const off = new Set(S.form.off || []);
+      if (off.has(b.dataset.sec)) off.delete(b.dataset.sec); else off.add(b.dataset.sec);
+      S.form.off = [...off]; drawSections(); changed();
+    });
+    $("btnPhrases").addEventListener("click", () => openPhrases(""));
+    $("phClose").addEventListener("click", () => $("phraseDlg").close());
+    $("phSave").addEventListener("click", savePhrase);
+    $("phText").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); savePhrase(); } });
+    $("phSearch").addEventListener("input", drawPhrases);
+    $("phCat").addEventListener("change", drawPhrases);
+    $("phList").addEventListener("click", async (e) => {
+      const del = e.target.closest("[data-del]");
+      if (del) { const r = await api("phrases/delete", { id: del.dataset.del }); PH.items = r.phrases; drawPhrases(); return; }
+      const row = e.target.closest("[data-id]"); if (!row) return;
+      const p = PH.items.find((x) => x.id === row.dataset.id);
+      $("phraseDlg").close();
+      if (p) insertInto(PH.target, p.text, false);
+    });
     $("duration").addEventListener("input", () => { S.form.duration = parseFloat($("duration").value) || 10; changed(); });
     $("winDur").addEventListener("change", () => { S.form.window_duration = $("winDur").checked; changed(); });
     $("modes").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (b) { S.form.mode = b.dataset.mode; changed(); refreshPreview(); } });
@@ -439,12 +667,16 @@
     $("cards").addEventListener("click", (e) => {
       const mv = e.target.closest("[data-move]"), rm = e.target.closest("[data-remove]"), card = e.target.closest("[data-card]");
       const subs = S.form.subjects;
-      if (mv) {
+      if (mv) {   // the <Subject N> tags in the text move with their subjects
         const [i, step] = mv.dataset.move.split(":").map(Number); const j = Math.max(0, Math.min(subs.length - 1, i + step));
-        [subs[i], subs[j]] = [subs[j], subs[i]]; S.selected = j;
+        if (i === j) return;
+        const before = snap(); swapSubjects(i + 1, j + 1); S.selected = j;
+        done(before, `Moved ${subjectName(subs[j], j + 1)} to ${j + 1}; its tags in the text moved with it.`); return;
       } else if (rm) {
-        const i = Number(rm.dataset.remove); if (!confirm(`Remove ${subjectName(subs[i], i + 1)}?`)) return;
-        subs.splice(i, 1); S.selected = Math.min(S.selected, Math.max(0, subs.length - 1));
+        const i = Number(rm.dataset.remove);
+        if (!confirm(`Remove ${subjectName(subs[i], i + 1)}? Its <Subject ${i + 1}> tags go from the text and the later subjects move up.`)) return;
+        const before = snap(); removeSubject(i + 1);
+        done(before, `Removed subject ${i + 1}.`); return;
       } else if (card) { S.selected = Number(card.dataset.card); }
       else return;
       drawCards(); drawEditor(); changed();
