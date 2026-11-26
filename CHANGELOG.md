@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.1] — 2026-11-26
+
+- The live preview scrolls inside its own box, and the checks sit under it instead of being drawn over it in a
+  shorter window. The preview panel now stays in view as the form scrolls.
+
 ## [0.3.0] — 2026-11-25
 
 The Prompt Builder is now a web app in the Prompt Builder tab, built the way the Video Editor is: its own HTML, CSS

@@ -45,9 +45,12 @@ textarea:focus, input:focus, select:focus { outline: 2px solid var(--accent); ou
 .chip.unused { border-style: dashed; border-color: var(--warn); }
 .cols { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
 .left { flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-.right { flex: 1 1 380px; min-width: 0; }
+.right { flex: 1 1 380px; min-width: 0; align-self: stretch; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-.sticky { position: sticky; top: 8px; max-height: calc(100vh - 16px); overflow: auto; }
+.sticky { position: sticky; top: 8px; max-height: calc(100vh - 16px); overflow: hidden; }
+.sticky > * { flex-shrink: 0; }
+.sticky > .preview { flex: 1 1 auto; min-height: 120px; overflow: auto; }
+.sticky > .checks { max-height: 34vh; overflow: auto; }
 .subject-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
 .scard { text-align: left; background: var(--bg); border: 1px solid var(--line2); border-radius: 6px; padding: 7px 9px; display: flex; flex-direction: column; gap: 3px; white-space: normal; }
 .scard.on { background: var(--sel); border-color: var(--accent); }
