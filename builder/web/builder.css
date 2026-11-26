@@ -53,10 +53,16 @@ textarea:focus, input:focus, select:focus { outline: 2px solid var(--accent); ou
 .sticky > * { flex-shrink: 0; }
 .sticky > .preview { flex: 1 1 auto; min-height: 120px; overflow: auto; }
 .sticky > .checks { max-height: 34vh; overflow: auto; }
-.subject-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
+/* Cards share the row and grow into the free space, up to 420px each, so one card stays card-sized and several
+   spread out; more wrap onto new rows once a card would drop under 240px. */
+.subject-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.subject-grid > .scard { flex: 1 1 240px; max-width: 420px; min-width: 0; }
+.subject-grid > .empty { flex: 1 1 100%; }
 .scard { text-align: left; background: var(--bg); border: 1px solid var(--line2); border-radius: 6px; padding: 7px 9px; display: flex; flex-direction: column; gap: 3px; white-space: normal; }
 .scard.on { background: var(--sel); border-color: var(--accent); }
-.scard .top { display: flex; gap: 6px; align-items: center; }
+.scard .top { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.scard .top strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scard .top .muted { white-space: nowrap; }
 .scard .tools { margin-left: auto; display: inline-flex; gap: 2px; }
 .scard .tools span { padding: 0 4px; color: var(--faint); cursor: pointer; } .scard .tools span:hover { color: var(--text); }
 .scard .sub { font-size: 12px; color: var(--muted); }

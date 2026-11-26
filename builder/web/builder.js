@@ -204,7 +204,7 @@
         const look = looks ? `${looks} source${looks > 1 ? "s" : ""}` : "description only";
         const voice = s.voice ? "voice from a reference" : "gender and tone";
         return `<div class="scard${i === S.selected ? " on" : ""}" data-card="${i}" role="button" tabindex="0">
-          <div class="top"><strong>${n} · ${esc(subjectName(s, n))}</strong><span class="muted small">${esc(s.kind)}</span>
+          <div class="top"><strong title="${esc(subjectName(s, n))}">${n} · ${esc(subjectName(s, n))}</strong><span class="muted small">${esc(s.kind)}</span>
           <span class="tools"><span data-move="${i}:-1" title="Move up">↑</span><span data-move="${i}:1" title="Move down">↓</span><span data-remove="${i}" title="Remove">✕</span></span></div>
           <div class="sub">Look: ${look}${(s.kind || "Character") === "Character" ? " · Voice: " + voice : ""}</div></div>`;
       }).join("");
