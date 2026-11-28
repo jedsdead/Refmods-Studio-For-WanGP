@@ -3692,7 +3692,9 @@ def _run_extract_job(pipeline_self, spec: dict, set_progress_status=None) -> Non
                 if not picks or round(cursor) > picks[-1]:
                     picks.append(round(cursor))
                 cursor += FPS_ASSUMED_FOR_DURATION_ESTIMATE / 2
-            picks = picks[:core.ENC_MAX_CLIP_FRAMES]
+            # Spread over the whole clip, not its first seconds: at two a second, the first 8 picks
+            # only reach 4 s (matches decode_encoder_frames, which rebuilds them the same way).
+            picks = [picks[i] for i in encframes.thin_evenly(len(picks), core.ENC_MAX_CLIP_FRAMES)]
             enc_frames.append(_qwen_frames_from_cthw(src[:, picks]))
             enc_times.extend(p / FPS_ASSUMED_FOR_DURATION_ESTIMATE for p in picks)
         else:
