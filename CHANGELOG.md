@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.5] — 2026-11-28
+
+- **Shrunk mods are kept on disk.** When a mod is re-encoded smaller to fit a generation, the result is saved in
+  `loras/refmods_plugin/shrink_cache/`, so the same mod at the same size and strength is never re-encoded again,
+  across restarts too. The folder holds up to 2 GB, oldest first out, and can be deleted at any time.
+- Pictures (and contact-sheet cells) are resized on the graphics card between the decode and the encode, instead of
+  on the CPU.
+
 ## [1.0.4] — 2026-11-28
 
 - **Refresh encoder frames** in a video mod's details rebuilds its frames from the mod itself, spread across the

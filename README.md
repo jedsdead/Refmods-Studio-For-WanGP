@@ -122,7 +122,9 @@ twice. It says so in the console and on its tab.
 Nothing needs moving:
 
 - Mods and presets stay in `loras/refmods_plugin/`, as with Refmods For Wan GP. Packs are in its `packs/` folder,
-  custom previews in `previews/`, and files added on the Create page in `uploads/`.
+  custom previews in `previews/`, and files added on the Create page in `uploads/`. Mods shrunk to fit a
+  generation are kept in `shrink_cache/` (up to 2 GB, oldest first out), so each is re-encoded once per size; the
+  folder can be deleted at any time.
 - Drafts, saved prompts and saved subjects stay in `loras/h3_prompt_builder/`, as with the Prompt Builder 4.4.0.
   If you're coming from 4.3 or earlier, they're copied in from the old plugin folder the first time Refmods Studio
   starts.

@@ -30,7 +30,7 @@ import gradio as gr
 from shared.utils.plugins import WAN2GPPlugin
 
 PLUGIN_NAME = "Refmods Studio"
-PLUGIN_VERSION = "1.0.4"
+PLUGIN_VERSION = "1.0.5"
 
 # Kept on this module so other plugins that look for Refmods by these names
 # still find it here: 2 Phases Plus checks the plugin module of an enabled

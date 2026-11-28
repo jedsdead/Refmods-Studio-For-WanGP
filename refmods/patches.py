@@ -2130,6 +2130,66 @@ _WEIGHTED_CACHE = collections.OrderedDict()
 _WEIGHTED_CACHE_MAX = 16
 _SHRINK_CACHE = collections.OrderedDict()
 _SHRINK_CACHE_MAX = 16
+# Shrunk mods are also kept on disk (loras/refmods_plugin/shrink_cache), so a mod is re-encoded once per size ever,
+# not once per session. Keyed by the exact latent bytes, the size and the VAE, so a changed mod or strength never
+# matches an old entry. Oldest files go first past the cap.
+SHRINK_DISK_CACHE_MAX_BYTES = 2 * 1024 ** 3
+
+
+def _shrink_cache_dir() -> str:
+    return os.path.join(os.path.dirname(storage.refmods_dir()), "shrink_cache")
+
+
+def _shrink_disk_key(pipeline_self, latent, kind, is_stack, width, height, sheet) -> str:
+    import hashlib
+    digest = hashlib.blake2b(digest_size=20)
+    data = latent.detach().to("cpu").contiguous()
+    digest.update(str((tuple(data.shape), str(data.dtype), kind, bool(is_stack), int(width), int(height),
+                       tuple(sheet) if sheet else None, type(getattr(pipeline_self, "vae", None)).__name__,
+                       str(getattr(getattr(pipeline_self, "vae", None), "_model_dtype", "")))).encode())
+    digest.update(data.view(torch.uint8).numpy().tobytes())
+    return digest.hexdigest()
+
+
+def _shrink_disk_get(key):
+    path = os.path.join(_shrink_cache_dir(), key + ".rmshrink")
+    if not os.path.isfile(path):
+        return None
+    try:
+        from safetensors.torch import load_file
+        latent = load_file(path, device="cpu")["latent"].clone()
+        os.utime(path)   # recently used: kept longest
+        return latent
+    except Exception:
+        return None
+
+
+def _shrink_disk_put(key, latent) -> None:
+    try:
+        from safetensors.torch import save_file
+        folder = _shrink_cache_dir()
+        os.makedirs(folder, exist_ok=True)
+        tmp = os.path.join(folder, key + ".tmp")
+        save_file({"latent": latent.detach().to("cpu").contiguous()}, tmp)
+        os.replace(tmp, os.path.join(folder, key + ".rmshrink"))
+        files = sorted((os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".rmshrink")),
+                       key=os.path.getmtime)
+        total = sum(os.path.getsize(f) for f in files)
+        while files and total > SHRINK_DISK_CACHE_MAX_BYTES:
+            oldest = files.pop(0)
+            total -= os.path.getsize(oldest)
+            os.remove(oldest)
+    except Exception:
+        _log("could not keep a shrunk RefMod on disk (it is still used):\n" + traceback.format_exc())
+
+
+def _resize_picture(pipeline_self, picture, height, width):
+    """A decoded picture [C, 1, H, W] resized on the graphics card (a picture is small there), else on the CPU."""
+    from models.minimax_h3 import pipeline as h3_pipeline
+    try:
+        return h3_pipeline._resize_video(picture.to(pipeline_self.device), int(height), int(width))
+    except Exception:
+        return h3_pipeline._resize_video(picture, int(height), int(width))
 
 
 def _cache_put(cache, key, value, limit):
@@ -2542,7 +2602,6 @@ def _reencode_sheet(pipeline_self, latent, sheet, width, height):
     thousands of pixels across); each picture alone decodes like any picture
     mod. Each is resized to its share of (width, height), encoded, and the
     sheet is laid out again."""
-    from models.minimax_h3 import pipeline as h3_pipeline
     rows, cols, count = (int(v) for v in sheet)
     cell_h, cell_w = latent.shape[-2] // rows, latent.shape[-1] // cols
     # fork.43: each picture an even number of latent cells (32px steps), so the
@@ -2556,7 +2615,7 @@ def _reencode_sheet(pipeline_self, latent, sheet, width, height):
         r, k = divmod(j, cols)
         cell = latent[:, :, :1, r * cell_h:(r + 1) * cell_h, k * cell_w:(k + 1) * cell_w]
         picture = _decode_cthw(pipeline_self, cell)[:, :1]
-        cells.append(pipeline_self._encode_video(h3_pipeline._resize_video(picture, px_h, px_w)))
+        cells.append(pipeline_self._encode_video(_resize_picture(pipeline_self, picture, px_h, px_w)))
     return _tile_stack(torch.cat(cells, dim=2))
 
 
@@ -2571,6 +2630,11 @@ def _reencode_smaller(pipeline_self, latent, kind, is_stack, width, height, shee
         if key in _SHRINK_CACHE:
             _SHRINK_CACHE.move_to_end(key)
             return _SHRINK_CACHE[key]
+        disk_key = _shrink_disk_key(pipeline_self, latent, kind, is_stack, width, height, sheet)
+        kept = _shrink_disk_get(disk_key)
+        if kept is not None:
+            _log(f"{kind} RefMod: using the copy shrunk earlier ({kept.shape[-1]}x{kept.shape[-2]} latent cells)")
+            return _cache_put(_SHRINK_CACHE, key, kept.to(dtype=latent.dtype), _SHRINK_CACHE_MAX)
         from models.minimax_h3 import pipeline as h3_pipeline
         if sheet and latent.shape[2] == 1 and int(sheet[2]) > 1:
             smaller = _reencode_sheet(pipeline_self, latent, sheet, width, height)
@@ -2578,8 +2642,7 @@ def _reencode_smaller(pipeline_self, latent, kind, is_stack, width, height, shee
             parts = []
             for j in range(latent.shape[2]):
                 picture = _decode_cthw(pipeline_self, latent[:, :, j:j + 1])[:, :1]
-                parts.append(pipeline_self._encode_video(
-                    h3_pipeline._resize_video(picture, int(height), int(width))))
+                parts.append(pipeline_self._encode_video(_resize_picture(pipeline_self, picture, height, width)))
             smaller = torch.cat(parts, dim=2)
         else:
             video = _decode_cthw(pipeline_self, latent)
@@ -2587,6 +2650,7 @@ def _reencode_smaller(pipeline_self, latent, kind, is_stack, width, height, shee
         # fork.40: cached in regular memory (as stored mods are), not on the
         # graphics card, so it holds no VRAM between generations.
         smaller = smaller.to(device="cpu", dtype=latent.dtype)
+        _shrink_disk_put(disk_key, smaller)
         return _cache_put(_SHRINK_CACHE, key, smaller, _SHRINK_CACHE_MAX)
     except Exception:
         _log("could not rebuild a RefMod smaller; using it at its stored size:\n" + traceback.format_exc())
