@@ -85,7 +85,8 @@ creating, decoding, strength previews, encoder frames and soundtracks.
   - **Edit pictures** drops or reorders a picture mod's pictures. **Trim** a voice or soundtrack (scrub through it to set the in and out points), or remove one.
     Neither re-encodes anything, so they're instant.
   - What needs the model runs as a short task: **Decompile**, **Strength preview** (the first picture at a few
-    strengths), **Decode to listen**, encoder frames, soundtracks, **Clean audio** and **Convert to Flux**.
+    strengths), **Decode to listen**, encoder frames (store them, or refresh a video mod's to cover the whole
+    clip), soundtracks, **Clean audio** and **Convert to Flux**.
   - **Replace preview** sets the picture shown for a mod. The mod itself doesn't change.
   - Flux mods store a small preview of each source picture. Older ones show a rough preview worked out from the
     mod itself until you replace it.

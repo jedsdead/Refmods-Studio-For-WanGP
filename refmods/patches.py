@@ -3339,7 +3339,10 @@ def _run_store_frames_job(pipeline_self, spec: dict, status) -> None:
         try:
             mod = storage.load_refmod(name)
             wanted = core.expected_enc_layout(mod.kind, mod.latent_t, mod.still_stack())
-            if mod.kind == "audio" or (mod.has_encoder_frames() and mod.enc_layout == wanted):
+            # "Refresh" rebuilds frames a mod already has (video mods from before 1.0.3 kept only
+            # their first 4 seconds).
+            if mod.kind == "audio" or (not spec.get("refresh") and mod.has_encoder_frames()
+                                       and mod.enc_layout == wanted):
                 skipped += 1
                 status(f"[{index}/{len(names)}] '{name}': nothing to do")
                 continue

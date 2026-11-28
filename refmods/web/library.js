@@ -289,7 +289,8 @@
       html += sec("decode", "Decompile", decoded ? "decoded" : "", `
         <p class="explain">Rebuilds the pictures, video and sound as files. These are reconstructions, not the originals.</p>
         <div class="row"><button data-job="decompile">${busy("decompile") ? "Decoding…" : decoded ? "Decompile again" : "Decompile"}</button>
-          ${visual && !it.frames ? `<button data-job="store_frames" title="So they aren't decoded every session">Store encoder frames</button>` : ""}</div>
+          ${visual && !it.frames ? `<button data-job="store_frames" title="So they aren't decoded every session">Store encoder frames</button>` : ""}
+          ${it.kind === "video" && it.frames ? `<button data-job="store_frames" data-refresh="1" title="Rebuilds this video mod's encoder frames from the mod itself, spread across the whole clip. Video mods made before 1.0.3 only had frames from their first 4 seconds.">Refresh encoder frames</button>` : ""}</div>
         ${out.pictures.length ? `<div class="pics">${out.pictures.map((f) => `<figure><img src="${outUrl(it, f)}" alt="">${esc(f)}
           <button data-usepv="${esc(f)}">Use as preview</button></figure>`).join("")}</div>` : ""}
         ${out.videos.map((f) => `<video controls preload="metadata" src="${outUrl(it, f)}"></video>`).join("")}
@@ -327,6 +328,7 @@
     RS.armed($("edDelete"), () => act(api("delete", { ids: [it.id] }), async () => { S.open = null; S.detail = null; await loadMods(); }));
     box.querySelectorAll("[data-job]").forEach((b) => b.addEventListener("click", () => {
       const op = b.dataset.job, extra = {};
+      if (b.dataset.refresh) extra.refresh = true;
       if (op === "clean_audio") extra.as_copy = $("cleanCopy") ? $("cleanCopy").checked : true;
       if (op === "strength") extra.strengths = [...box.querySelectorAll(".stv")].map((x) => +x.value).filter((v) => v > 0);
       if (op === "convert") Object.assign(extra, { flux_model: $("fxModel").value, budget: +$("fxBudget").value, layout: $("fxLayout").value });

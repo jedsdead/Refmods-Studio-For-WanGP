@@ -1,11 +1,17 @@
 # Changelog
 
+## [1.0.4] — 2026-11-28
+
+- **Refresh encoder frames** in a video mod's details rebuilds its frames from the mod itself, spread across the
+  whole clip, for video mods made before 1.0.3 (whose frames covered only the first 4 seconds). It runs as a short
+  task on the H3 model, like Store encoder frames.
+
 ## [1.0.3] — 2026-11-28
 
 - **Video mods' encoder frames cover the whole clip.** A new video mod stores up to 8 frames for the text encoder,
   but they were the first 8 at two a second, so only the first 4 seconds. They're now spread evenly from the first
-  frame to the last, the way frames rebuilt for older mods already were. Existing mods keep their frames; **Store
-  encoder frames** in the Library only fills in mods that have none.
+  frame to the last, the way frames rebuilt for older mods already were. Existing mods keep their frames until
+  refreshed (1.0.4).
 
 ## [1.0.2] — 2026-11-28
 

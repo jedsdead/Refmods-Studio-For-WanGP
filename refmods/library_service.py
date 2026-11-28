@@ -788,7 +788,8 @@ class Jobs:
                                                         "strengths": strengths})
                 elif op == "store_frames":
                     self._task(record, model_type, {"op": "store_frames", "names": names,
-                                                    "all_missing": bool(payload.get("all_missing"))})
+                                                    "all_missing": bool(payload.get("all_missing")),
+                                                    "refresh": bool(payload.get("refresh"))})
                 elif op == "soundtrack":
                     remove = bool(payload.get("remove"))
                     path = None if remove else upload_path(payload.get("upload"))
