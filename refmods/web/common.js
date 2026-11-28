@@ -43,7 +43,7 @@
   applyZoom();
   window.addEventListener("storage", (e) => { if (e.key === "refmods-studio.zoom") applyZoom(); });
   // Fixed-position things are placed in the page's own (zoomed) pixels, so pointer positions are divided by it.
-  RS.zoom = () => parseFloat(document.documentElement.style.zoom) || 1;
+  RS.pageZoom = () => parseFloat(document.documentElement.style.zoom) || 1;
   RS.store = function (key, value) {
     try { if (value === undefined) return localStorage.getItem(key); localStorage.setItem(key, value); } catch (_) { /* no storage here */ }
     return null;

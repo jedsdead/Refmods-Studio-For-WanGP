@@ -121,7 +121,7 @@
       <details class="sec h3-only" id="cAdvanced"><summary>Advanced</summary><div class="secbody">
         <div class="grid3">
           <label class="fld">Reference size (short edge, px)<input type="number" id="cRefRes" min="256" max="2048" step="64" value="1024"></label>
-          <label class="fld">Prompt-view size (long edge, px)<input type="number" id="cEncRes" min="256" max="2048" step="64" value="1024"></label>
+          <label class="fld" title="New H3 mods always store encoder frames: the pictures the text encoder is shown, so the mod gets its &lt;Picture N&gt; label without decoding anything. This sets their size.">Encoder frame size (long edge, px)<input type="number" id="cEncRes" min="256" max="2048" step="64" value="1024"></label>
           <label class="fld">Max tokens (0 = no cap)<input type="number" id="cMaxTok" min="0" max="65536" step="512" value="65536"></label>
           <label class="fld compressed">Pool grid height<input type="number" id="cPoolH" min="2" max="64" step="2" value="16"></label>
           <label class="fld compressed">Pool grid width<input type="number" id="cPoolW" min="2" max="64" step="2" value="16"></label>

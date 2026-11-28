@@ -223,7 +223,7 @@
     };
     box.onpointermove = (e) => {
       if (!drag) return;
-      const z = RS.zoom(), W = img.clientWidth, H = img.clientHeight, dx = (e.clientX - drag.x) / z, dy = (e.clientY - drag.y) / z, r = { ...drag.r };
+      const z = RS.pageZoom(), W = img.clientWidth, H = img.clientHeight, dx = (e.clientX - drag.x) / z, dy = (e.clientY - drag.y) / z, r = { ...drag.r };
       if (drag.mode === "move") {
         r.x = Math.max(0, Math.min(W - r.w, r.x + dx)); r.y = Math.max(0, Math.min(H - r.h, r.y + dy));
       } else {

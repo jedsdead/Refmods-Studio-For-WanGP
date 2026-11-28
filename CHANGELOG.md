@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2] — 2026-11-28
+
+- **Cropping works again.** In 1.0.1 the page-size code took the name of the picture viewer, so dragging the crop
+  box or its corners did nothing. Both work at any page size.
+- Create's **Prompt-view size** is now called **Encoder frame size**, the name the Library uses, with a note that
+  new H3 mods always store them.
+
 ## [1.0.1] — 2026-11-26
 
 - **Page size** on the Settings subtab makes Refmods, the Prompt Builder and Settings smaller or larger (80% to
